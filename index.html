@@ -362,6 +362,7 @@ input,textarea,select{font:inherit;color:var(--ink)}
 .burst i{position:absolute;left:var(--x);top:62%;font-style:normal;font-size:var(--s);opacity:0;animation:floatUp var(--d) ease-out var(--dl) both}
 @keyframes floatUp{0%{opacity:0;transform:translateY(0) scale(.5)}15%{opacity:1}100%{opacity:0;transform:translateY(-75vh) rotate(25deg) scale(1.1)}}
 .calmName{padding:0 130px}
+.loadPill{position:fixed;left:50%;bottom:calc(10px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);z-index:45;background:var(--card);color:var(--ink);border-radius:99px;padding:8px 18px 6px;font-weight:700;font-size:17px;box-shadow:0 8px 24px var(--shadow);white-space:nowrap;animation:fade .3s}
 
 @media (max-width:820px){
   .mean{grid-template-columns:104px 1fr}
@@ -510,15 +511,90 @@ const SFX={ctx:null,
   bell(f){ this.tone(f,0,2.6,'sine',.07); this.tone(f*2.01,0,1.3,'sine',.015) }
 };
 
+/* ================= Kokoro voice packs: natural recorded speech for every built-in line ================= */
+// Each buddy has a pack: voices/<pack>.json (hash -> [offset,length]) + voices/<pack>.bin (MP3 clips back to back).
+// Lines that are not in the pack (custom buttons, custom stories, names) fall back to the tablet's own voice or a parent recording.
+const Clips={
+  base:'voices/v1/', packs:{}, decoded:new Map(), playing:[], onProgress:null,
+  fnv(s){ let h=0x811c9dc5; for(const b of new TextEncoder().encode(s)){ h^=b; h=Math.imul(h,0x01000193)>>>0 } return h.toString(16).padStart(8,'0') },
+  norm(t){ return String(t==null?'':t).replace(/\s+/g,' ').trim() },
+  enabled(){ return cfg.kokoro!==false },
+  pack(id){ return this.packs[id] },
+  status(id){ const p=this.packs[id]; return !p?'none':p.ok?'ready':p.failed?'failed':'loading' },
+  ready(id){
+    if(!id) return Promise.resolve(false);
+    const p=this.packs[id]||(this.packs[id]={ok:false,failed:false,progress:0});
+    if(p.ok) return Promise.resolve(true); if(p.failed) return Promise.resolve(false);
+    if(p.loading) return p.loading;
+    p.loading=(async()=>{
+      try{
+        const ir=await fetch(this.base+id+'.json',{cache:'force-cache'}); if(!ir.ok) throw new Error('no index');
+        p.index=(await ir.json()).h||{};
+        const r=await fetch(this.base+id+'.mp3',{cache:'force-cache'}); if(!r.ok) throw new Error('no pack');
+        const total=+r.headers.get('content-length')||0;
+        if(r.body&&total){ const reader=r.body.getReader(), chunks=[]; let got=0;
+          for(;;){ const {done,value}=await reader.read(); if(done) break; chunks.push(value); got+=value.length; p.progress=got/total; if(this.onProgress) this.onProgress(id,p.progress) }
+          const all=new Uint8Array(got); let o=0; for(const c of chunks){ all.set(c,o); o+=c.length } p.buf=all.buffer }
+        else p.buf=await r.arrayBuffer();
+        p.ok=true; p.progress=1; if(this.onProgress) this.onProgress(id,1); return true
+      }catch(e){ console.warn('voice pack unavailable',id,e); p.failed=true; if(this.onProgress) this.onProgress(id,-1); return false }
+      finally{ p.loading=null }
+    })();
+    return p.loading },
+  has(id,key){ const p=this.packs[id]; return !!(p&&p.ok&&p.index[this.fnv(key)]) },
+  async buffer(id,key){
+    const ck=id+':'+key; if(this.decoded.has(ck)) return this.decoded.get(ck);
+    const p=this.packs[id]; const e=p&&p.index[this.fnv(key)]; if(!e) return null;
+    const ctx=SFX.raw(); if(!ctx) return null;
+    const slice=p.buf.slice(e[0],e[0]+e[1]);
+    const ab=await new Promise((res,rej)=>{ const r=ctx.decodeAudioData(slice,res,rej); if(r&&r.then) r.then(res,rej) });
+    if(this.decoded.size>300){ const first=this.decoded.keys().next().value; this.decoded.delete(first) }
+    this.decoded.set(ck,ab); return ab },
+  async mediaBuffer(dataUrl){
+    const ck='m:'+dataUrl.slice(-40)+dataUrl.length; if(this.decoded.has(ck)) return this.decoded.get(ck);
+    const ctx=SFX.raw(); if(!ctx) return null;
+    const bytes=await (await fetch(dataUrl)).arrayBuffer();
+    const ab=await new Promise((res,rej)=>{ const r=ctx.decodeAudioData(bytes,res,rej); if(r&&r.then) r.then(res,rej) });
+    this.decoded.set(ck,ab); return ab },
+  // Turn what the app wants to say into clip keys. Returns null when any piece is missing from the pack.
+  resolve(id,text,opts={}){
+    const parts=Array.isArray(text)?text:[text]; const segs=[];
+    for(const part of parts){
+      if(part&&typeof part==='object'){ if(part.audio) segs.push(part); continue }
+      const key=this.norm(part); if(!key) continue;
+      if(opts.slow&&this.has(id,key+'|slow')){ segs.push({key:key+'|slow'}); continue }
+      if(this.has(id,key)){ segs.push({key}); continue }
+      const sents=Voice.sentences(key); if(sents.length<2) return null;
+      for(const s of sents){ if(!this.has(id,s)) return null; segs.push({key:s,pause:.22}) }
+    }
+    return segs.length?segs:null },
+  stop(){ for(const s of this.playing){ try{ s.stop() }catch(e){} } this.playing=[] },
+  async play(id,segs,opts={}){
+    const ctx=SFX.raw(); if(!ctx) return false;
+    const bufs=[]; for(const s of segs){ const b=s.audio?await this.mediaBuffer(await Store.getMedia(s.audio)):await this.buffer(id,s.key); if(!b) return false; bufs.push([b,s.pause||.1]) }
+    this.stop(); const rate=clamp(+(opts.rate||1),.8,1.2);
+    return new Promise(res=>{
+      let t=ctx.currentTime+.03, last=null; const mine=[];
+      bufs.forEach(([b,pause],i)=>{ const src=ctx.createBufferSource(); src.buffer=b; src.playbackRate.value=rate; src.connect(ctx.destination); src.start(t); t+=b.duration/rate+(i<bufs.length-1?pause:0); mine.push(src); last=src });
+      this.playing=mine; let done=false; const fin=()=>{ if(done) return; done=true; clearInterval(watch); if(this.playing===mine) this.playing=[]; res(true) };
+      last.onended=fin;
+      const total=(t-ctx.currentTime)*1000+150; setTimeout(fin,total);
+      const watch=setInterval(()=>{ if(this.playing!==mine) fin() },120);   // a stop() from outside ends the promise early
+    }) }
+};
+
 /* ================= voices: 5 buddies built on the device's speech engine ================= */
 // Gentle pitch/speed values: anything far from 1.0 makes a speech engine sound robotic.
+// pack = the Kokoro voice pack (natural recorded speech); pitch/rate only shape the tablet-voice fallback
 const DEFAULT_VOICES=[
-  {id:'lily',name:'Lily',kind:'girl',emoji:'🐰',pitch:1.15,rate:.95,voiceURI:''},
-  {id:'mia',name:'Mia',kind:'girl',emoji:'🦋',pitch:1.05,rate:.92,voiceURI:''},
-  {id:'rosie',name:'Rosie',kind:'girl',emoji:'🌸',pitch:1.25,rate:.98,voiceURI:''},
-  {id:'leo',name:'Leo',kind:'boy',emoji:'🦁',pitch:.95,rate:.95,voiceURI:''},
-  {id:'max',name:'Max',kind:'boy',emoji:'🐻',pitch:.85,rate:.9,voiceURI:''}
+  {id:'lily',name:'Lily',kind:'girl',emoji:'🐰',pack:'lily',kokoro:'Heart',pitch:1.15,rate:.95,voiceURI:''},
+  {id:'mia',name:'Mia',kind:'girl',emoji:'🦋',pack:'mia',kokoro:'Emma (British)',pitch:1.05,rate:.92,voiceURI:''},
+  {id:'rosie',name:'Rosie',kind:'girl',emoji:'🌸',pack:'rosie',kokoro:'Bella',pitch:1.25,rate:.98,voiceURI:''},
+  {id:'leo',name:'Leo',kind:'boy',emoji:'🦁',pack:'leo',kokoro:'Puck',pitch:.95,rate:.95,voiceURI:''},
+  {id:'max',name:'Max',kind:'boy',emoji:'🐻',pack:'max',kokoro:'Michael',pitch:.85,rate:.9,voiceURI:''}
 ];
+const PACKS={lily:'Heart (girl)',mia:'Emma (girl, British)',rosie:'Bella (girl)',leo:'Puck (boy)',max:'Michael (boy)'};
+function otherBuddy(b){ const vs=cfg.voices.filter(v=>v.pack&&v.id!==b.id); return vs.find(v=>v.kind!==b.kind)||vs[0]||b }
 const MALE_RX=/\bmale\b|\bman\b|boy|daniel|david|alex\b|fred|george|james|mark\b|rishi|aaron|arthur|guy|thomas|oliver|\btom\b|eddy|reed|rocko|-iol|-iom|-tpd|-gbd|-rjs|-aub|-ene\b|#male/i;
 const FEMALE_RX=/female|woman|girl|samantha|karen|victoria|zira|susan|serena|moira|tessa|fiona|allison|\bava\b|\bzoe\b|nicky|kate|hazel|libby|sonia|aria|jenny|-sfg|-iob|-iog|-tpc|-tpf|-gba|-gbc|-gbg|-aua|#female|google us english|google uk english female/i;
 const NOVELTY_RX=/espeak|compact|albert|bad news|bahh|bells|boing|bubbles|cellos|deranged|good news|hysterical|junior|kathy|organ|princess|ralph|trinoids|whisper|zarvox|wobble|jester|superstar|grandma|grandpa|flo\b|sandy|shelley|rocko|eddy|reed/i;
@@ -547,10 +623,26 @@ const Voice={
   clean(t){ return String(t==null?'':t).replace(/[\u{1F000}-\u{1FAFF}\u{2600}-\u{27BF}\u{FE0F}\u{200D}]/gu,'').replace(/…/g,',').replace(/\s+/g,' ').trim() },
   // one utterance per sentence: engines pause naturally and never trip over long text
   sentences(t){ const s=this.clean(t); if(!s) return []; const parts=s.match(/[^.!?]+[.!?]+["”’)]*|[^.!?]+$/g)||[s]; return parts.map(p=>p.trim()).filter(Boolean) },
-  stop(){ try{ if(this.has()) speechSynthesis.cancel() }catch(e){} if(this.audio){ this.audio.pause(); this.audio=null } this.mark(null); Music.duck(false) },
+  stop(){ Clips.stop(); try{ if(this.has()) speechSynthesis.cancel() }catch(e){} if(this.audio){ this.audio.pause(); this.audio=null } this.mark(null); Music.duck(false) },
   mark(el){ if(this.talkingEl) this.talkingEl.classList.remove('talking'); this.talkingEl=el; if(el) el.classList.add('talking') },
-  say(text,opts={}){
+  say(text,opts={}){ return this._say(text,opts) },
+  async _say(text,opts){
     if(this.audio){ this.audio.pause(); this.audio=null }
+    // 1. natural voice: Kokoro clips from the buddy's pack
+    let b=opts.buddy||activeBuddy();
+    if(opts.other){ const o=otherBuddy(b); if(o.pack&&Clips.status(o.pack)==='ready') b=o; else if(o.pack) Clips.ready(o.pack) }   // the other voice only when it is already loaded
+    if(Clips.enabled()&&b.pack){
+      Clips.stop();
+      const ok=await Clips.ready(b.pack);
+      if(ok){ const segs=Clips.resolve(b.pack,text,{slow:(opts.rateMul||1)<.9}); 
+        if(segs){ if(opts.el) this.mark(opts.el); Music.duck(true); this.works=true; hideVoiceNote();
+          const played=await Clips.play(b.pack,segs,{rate:cfg.speed||1});
+          if(this.talkingEl===opts.el) this.mark(null); Music.duck(false); if(played) return } }
+    }
+    // 2. fallback: the tablet's own speech engine
+    const flat=Array.isArray(text)?text.map(x=>typeof x==='string'?x:'').join(' '):text;
+    return this.tts(flat,Object.assign({},opts,{buddy:b})) },
+  tts(text,opts={}){
     const parts=this.sentences(text); if(!parts.length) return Promise.resolve();
     if(!this.has()){ this.fail(); return Promise.resolve() }
     const synth=window.speechSynthesis, wasBusy=synth.speaking||synth.pending;
@@ -593,7 +685,7 @@ function showVoiceNote(){
 function hideVoiceNote(){ const n=$('.voiceNote'); if(n) n.remove() }
 function voiceHelp(){
   const s=modal(h('div',{class:'sheet'},h('h2',null,'Getting the voice to talk'),
-    h('p',{class:'muted'},'EchoBridge speaks with the voices built into your tablet, so nothing downloads and it works offline. If it is silent:'),
+    h('p',{class:'muted'},'All the built-in games use natural Kokoro voices that come with the app. Words you add yourself use the tablet’s own voice, or a recording you make. If the tablet voice is silent or sounds robotic:'),
     h('ol',{class:'tips'},
       h('li',null,'Turn the volume up and check the tablet is not on silent or “Do not disturb”.'),
       h('li',null,'Open EchoBridge in Chrome (or Safari on an iPad). The viewers inside some apps block speech.'),
@@ -973,8 +1065,8 @@ function listenRounds(li){
     else if(li<6){ const cats=Object.keys(CATWORD); const c=cats[(r+li)%cats.length]; const t=pickN(THINGS.filter(x=>x[2]===c),1)[0];
       items=[t,...pickN(THINGS.filter(x=>x[2]!==c),n-1)]; targets=[t]; say=`Tap ${CATWORD[c]}.` }
     else if(li<9){ const t=pickN(THINGS.filter(x=>x[3]),1)[0]; items=[t,...pickN(THINGS.filter(x=>x!==t&&x[3]!==t[3]),n-1)]; targets=[t]; say=`Tap the one that ${t[3]}.`.replace('that we','we') }
-    else { const k=li<12?2:3; items=pickN(THINGS,n); targets=items.slice(0,k); say='Tap the '+targets.map(t=>t[1]).join(', then the ')+'.' }
-    rounds.push({items:shuffle(items),targets,say});
+    else { const k=li<12?2:3; items=pickN(THINGS,n); targets=items.slice(0,k); say='Tap the '+targets.map(t=>t[1]).join(', then the ')+'.'; var segs=targets.map((t,j)=>(j?'then the ':'Tap the ')+t[1]+(j===targets.length-1?'.':',')) }
+    rounds.push({items:shuffle(items),targets,say,segs:segs||null}); segs=null;
   }
   return rounds }
 
@@ -1006,7 +1098,7 @@ function iyQuestions(li){ const [ask,ans,items]=IY[li];
 "use strict";
 /* ================= config ================= */
 const V1_SAYS=['I want to eat apples','I want a drink of water','I want a snack','I am all done eating','I want to play with blocks','I want to go outside','I want to play with you','I want my toy','I feel sleepy','I want to lie down','I want quiet time','It is too loud','I need a hug','I need a break','I want my calm corner','I feel happy','I like this','Again, please','I love you','I want Mom','I want Dad','I want to take a bath'];
-function defaults(){ return {v:3,updatedAt:0,childName:'',pin:'1234',sfx:true,calmSound:true,calmVoice:true,music:true,musicVol:.5,speed:1,activeVoice:'lily',voices:clone(DEFAULT_VOICES),needs:NEEDS(),scripts:SCRIPTS(),scenarios:SCENARIOS(),progress:{}} }
+function defaults(){ return {v:4,updatedAt:0,childName:'',pin:'1234',sfx:true,calmSound:true,calmVoice:true,music:true,musicVol:.5,speed:1,activeVoice:'lily',voices:clone(DEFAULT_VOICES),needs:NEEDS(),scripts:SCRIPTS(),scenarios:SCENARIOS(),progress:{}} }
 function normalize(c){
   const d=defaults(); if(!c) return d; c=Object.assign({},d,c);
   if((c.v||1)<2){
@@ -1019,6 +1111,7 @@ function normalize(c){
   if((c.v||1)<3){   // natural voices: the 5 buddies get the new gentle pitch and speed
     (c.voices||[]).forEach(v=>{ const d=DEFAULT_VOICES.find(x=>x.id===v.id); if(d){ v.pitch=d.pitch; v.rate=d.rate } else { v.pitch=clamp(+v.pitch||1,.7,1.4); v.rate=clamp(+v.rate||1,.7,1.25) } });
     if(c.music==null) c.music=true; if(c.musicVol==null) c.musicVol=.5; if(c.speed==null) c.speed=1; c.v=3 }
+  if((c.v||1)<4){ (c.voices||[]).forEach(v=>{ const d=DEFAULT_VOICES.find(x=>x.id===v.id); if(d){ v.pack=d.pack; v.kokoro=d.kokoro } else if(!v.pack){ v.pack=v.kind==='boy'?'leo':'lily'; v.kokoro=PACKS[v.pack] } }); c.v=4 }
   for(const k of ['needs','scripts','scenarios','voices']) if(!Array.isArray(c[k])||!c[k].length&&k==='voices') c[k]=d[k];
   if(!c.progress||typeof c.progress!=='object') c.progress={};
   return c }
@@ -1039,7 +1132,7 @@ const FEATS=[
     qs:li=>YN.slice(li*4,li*4+4).map(([e,q,a])=>({text:'',emojis:e,question:q,yesno:true,options:[
       {emoji:'👍',text:'Yes',correct:!!a,why:a?'Yes, that’s right!':'Hmm, I don’t think so.'},{emoji:'👎',text:'No',correct:!a,why:!a?'That’s right, the answer is no!':'Hmm, I think it is yes.'}]}))},
   {id:'wh',title:'Ask & answer',art:'wh',color:'#FFF6DA',levels:()=>WH_NAMES.map((n,i)=>({name:n,emoji:WH[i][0].e})),
-    qs:li=>WH[li].map(w=>({text:'',emojis:w.e,question:w.q,options:w.opts.map((o,i)=>({emoji:o[0],text:o[1],correct:i===0,why:i===0?`Yes! ${o[1]}.`:`Hmm, not ${o[1].charAt(0).toLowerCase()+o[1].slice(1)}.`}))}))},
+    qs:li=>WH[li].map(w=>({text:'',emojis:w.e,question:w.q,options:w.opts.map((o,i)=>({emoji:o[0],text:o[1],correct:i===0,why:i===0?`Yes! ${o[1]}.`:`Hmm, not ${o[1].charAt(0).toLowerCase()+o[1].slice(1)}.`,whySay:i===0?['Yes!',o[1]]:['Hmm, not',o[1]]}))}))},
   {id:'order',title:'First, then',art:'order',color:'#E3F2FC',levels:()=>ORDER.map(o=>({name:o[0],emoji:o[1]})),play:li=>viewOrder(li)},
   {id:'listen',title:'Listen & tap',art:'listen',color:'#EEE9FC',levels:()=>LISTEN_NAMES.map((n,i)=>({name:n,emoji:['👂','🐶','🍎','🧸','🚲','👟','⏰','☂️','🪁','✌️','🎯','🎈','🌟','🏆','🎉'][i]})),play:li=>viewListen(li)},
   {id:'iyou',title:'I or you?',art:'iyou',color:'#E3F6EF',levels:()=>IY.map((x,i)=>({name:x[1]+'…',emoji:x[2][0][0]})),qs:li=>iyQuestions(li)}
@@ -1060,12 +1153,20 @@ function musicBtn(){ const b=h('button',{class:'musicBtn','aria-label':'Menu mus
 function openBuddyPicker(){ SFX.pop();
   const grid=h('div',{class:'row',style:'justify-content:center;gap:14px'});
   const s=modal(h('div',{class:'sheet',style:'width:min(640px,100%);text-align:center'},h('h2',null,'Who should talk?'),grid,h('div',{style:'margin-top:16px'},h('button',{class:'btn',onclick:()=>s.remove()},'Close'))));
-  cfg.voices.forEach(b=>grid.append(h('button',{class:'card',style:`width:130px;min-height:140px;${b.id===cfg.activeVoice?'outline:5px solid var(--green)':''}`,onclick:async()=>{ cfg.activeVoice=b.id; Store.later(); s.remove(); refreshBuddyChip(); await Voice.say(`Hi! I’m ${b.name}.`,{buddy:b}) }},h('span',{class:'ce'},b.emoji),h('span',{class:'ct'},b.name)))) }
+  cfg.voices.forEach(b=>grid.append(h('button',{class:'card',style:`width:130px;min-height:140px;${b.id===cfg.activeVoice?'outline:5px solid var(--green)':''}`,onclick:async()=>{ cfg.activeVoice=b.id; Store.later(); s.remove(); refreshBuddyChip(); loadPill(b); await Voice.say(buddyHello(b),{buddy:b}) }},h('span',{class:'ce'},b.emoji),h('span',{class:'ct'},b.name)))) }
+function buddyHello(b){ return DEFAULT_VOICES.some(d=>d.name===b.name)?`Hi! I’m ${b.name}.`:'Hi!' }
+// true when the typed child's name can be spoken by the current voice (tablet voice); Kokoro packs use the recorded name instead
+function typedNameOk(){ return !(Clips.enabled()&&activeBuddy().pack) }
+function withName(text){ if(!cfg.childName) return text; if(typedNameOk()) return text.replace(/^Hi there!/,`Hi, ${cfg.childName}!`); if(cfg.nameAudio) return [{audio:cfg.nameAudio},text]; return text }
+// a small pill while a buddy's voice pack downloads (first time only; it is cached after that)
+function loadPill(b){ if(!b||!b.pack||!Clips.enabled()||Clips.status(b.pack)==='ready') return; let pill=$('.loadPill'); if(!pill){ pill=h('div',{class:'loadPill',role:'status'}); document.body.append(pill) }
+  const draw=(id,pr)=>{ if(id!==b.pack) return; if(pr>=1||pr<0){ pill.textContent=pr<0?`${b.emoji} ${b.name} will use the tablet voice for now`:`${b.emoji} ${b.name} is ready!`; setTimeout(()=>pill.remove(),pr<0?3500:1200); Clips.onProgress=null; return } pill.textContent=`${b.emoji} ${b.name} is getting ready… ${Math.round(pr*100)}%` };
+  Clips.onProgress=draw; draw(b.pack,Clips.pack(b.pack)?Clips.pack(b.pack).progress||0:0); Clips.ready(b.pack).then(()=>{ const o=otherBuddy(b); if(o&&o.pack) Clips.ready(o.pack) }) }
 function viewHome(){
   const v=makeView('home');
   v.append(cornerBtn('gear',openPin,'Grown-up corner'));
   const greet=cfg.childName?`Hi, ${cfg.childName}!`:'Hi there!';
-  v.append(h('div',{class:'topbar'},h('button',{class:'hello',onclick:()=>{ SFX.pop(); Voice.say(`${greet} What do you want to play?`) }},'👋 '+greet)));
+  v.append(h('div',{class:'topbar'},h('button',{class:'hello',onclick:()=>{ SFX.pop(); Voice.say(withName('Hi there! What do you want to play?')) }},'👋 '+greet)));
   const scroll=h('div',{class:'hiveScroll'}), hive=h('div',{class:'hive'}); scroll.append(hive); v.append(scroll);
   FEATS.forEach(F=>{
     const b=h('button',{class:'tile','aria-label':F.title},h('div',{class:'rim'}),h('div',{class:'art',html:ART[F.art]}),h('span',{class:'tlabel'},F.title));
@@ -1095,7 +1196,7 @@ function viewLevels(fid){
     if(L.photo){ const im=mediaImg(L.photo,L.name); im.style.cssText='position:absolute;inset:0;width:100%;height:100%;object-fit:cover;opacity:.9'; art.append(im) }
     art.append(h('span',{class:'lvE'},L.emoji||'⭐'),h('span',{class:'lvN'},i+1),h('span',{class:'lvS','aria-label':st+' stars'},'★'.repeat(st)+'☆'.repeat(3-st)),h('span',{class:'lvT'},L.name||''));
     const b=h('button',{class:'lv'+(i===next?' next':''),'aria-label':`Level ${i+1}, ${L.name||''}`},h('div',{class:'rim'}),art);
-    b.addEventListener('click',()=>{ if(busy) return; SFX.pop(); Voice.say(`Level ${i+1}. ${L.name||''}`); go(()=>playLevel(fid,i),b) });
+    b.addEventListener('click',()=>{ if(busy) return; SFX.pop(); Voice.say([`Level ${i+1}.`,L.name||'']); go(()=>playLevel(fid,i),b) });
     hive.append(b) });
   const lay=()=>{ const n=lv.length, cols=5, rows=Math.ceil(n/cols);
     const W=innerWidth-60, H=innerHeight-150;
@@ -1117,7 +1218,8 @@ function finishScreen(body,fid,li,stars,replay){
   if(li+1<total) row.append(h('button',{class:'bigBtn',onclick:e=>{ SFX.pop(); go(()=>playLevel(fid,li+1),e.currentTarget,{quick:true}) }},'Next level ▶'));
   row.append(h('button',{class:'bigBtn alt',onclick:()=>{ SFX.pop(); replay() }},'Play again'),h('button',{class:'bigBtn ghost',onclick:e=>go(()=>viewLevels(fid),e.currentTarget,{quick:true})},'All levels'));
   body.append(starBurst(),h('div',{class:'done'},st,h('h2',null,`You did it${name}!`),h('p',{class:'muted',style:'font-size:24px;margin:0'},`Level ${li+1} of ${total}`),row));
-  Voice.say([`You did it${name}! Great job.`,`Wonderful${name}! You did it.`,`Hooray${name}! All done.`][li%3]) }
+  const cheer=['You did it! Great job.','Wonderful! You did it.','Hooray! All done.'][li%3];
+  Voice.say(typedNameOk()&&cfg.childName?cheer.replace(/^([^!]+)!/,`$1, ${cfg.childName}!`):withName(cheer)) }
 
 /* ================= QUIZ ENGINE (stories, feelings, yes/no, questions, I or you) ================= */
 function viewQuiz(fid,li){
@@ -1127,7 +1229,7 @@ function viewQuiz(fid,li){
   let qs=F.qs(li), i=0, done=0, mistakes=0, locked=false, timer=0;
   const progress=()=>{ const p=h('div',{class:'progress'}); qs.forEach((_,k)=>p.append(h('i',{class:k<done?'on':''}))); return p };
   const live=()=>v.isConnected;
-  async function narrate(q){ if(q.text){ await Voice.say(q.text); if(!live()||locked) return; await wait(250) } if(q.say&&!locked){ await Voice.say(q.say,{pitchMul:.9}); if(!live()||locked) return; await wait(250) } if(live()&&!locked) Voice.say(q.question) }
+  async function narrate(q){ if(q.text){ await Voice.say(q.text); if(!live()||locked) return; await wait(250) } if(q.say&&!locked){ await Voice.say(q.say,{other:true,pitchMul:.9}); if(!live()||locked) return; await wait(250) } if(live()&&!locked) Voice.say(q.question) }
   function render(){
     const q=qs[i]; locked=false; body.innerHTML='';
     const scene=h('div',{class:'scene'+(q.say||q.caption?' hasSay':'')});
@@ -1148,10 +1250,10 @@ function viewQuiz(fid,li){
           const next=h('button',{class:'bigBtn',onclick:()=>{ SFX.pop(); if(!last){ i++; render() } else finishScreen(body,fid,li,mistakes===0?3:mistakes<=2?2:1,()=>{ qs=F.qs(li); i=0; done=0; mistakes=0; render() }) }},last?'Finish':'Next',h('span',{'aria-hidden':'true'},' ▶'));
           feedback.innerHTML=''; feedback.append(h('div',{class:'why good'},h('span',{class:'big'},'⭐'),h('span',null,o.why||'Yes! Great thinking.')),h('div',{style:'margin-top:16px'},next));
           try{ next.scrollIntoView({block:'nearest',behavior:'smooth'}) }catch(e){}
-          await wait(450); if(live()) Voice.say(o.why||'Yes! Great thinking.') }
+          await wait(450); if(live()) Voice.say(o.whySay||o.why||'Yes! Great thinking.') }
         else{ mistakes++; card.classList.add('nudge'); setTimeout(()=>card.classList.remove('nudge'),520); if(!q.yesno) card.classList.add('gone'); SFX.soft();
-          const msg=(o.why||'Hmm, let’s think again.')+' Let’s try again.';
-          feedback.innerHTML=''; feedback.append(h('div',{class:'why'},h('span',{class:'big'},'💭'),h('span',null,msg))); try{ feedback.scrollIntoView({block:'nearest',behavior:'smooth'}) }catch(e){} Voice.say(msg) } };
+          const why=o.why||'Hmm, let’s think again.', msg=why+' Let’s try again.';
+          feedback.innerHTML=''; feedback.append(h('div',{class:'why'},h('span',{class:'big'},'💭'),h('span',null,msg))); try{ feedback.scrollIntoView({block:'nearest',behavior:'smooth'}) }catch(e){} Voice.say([].concat(o.whySay||why,'Let’s try again.')) } };
       card.addEventListener('click',choose); card.addEventListener('keydown',e=>{ if(e.key==='Enter'||e.key===' '){ e.preventDefault(); choose() } });
       opts.append(card) });
     const right=h('div',null,h('p',{class:'q'},speakBtn(()=>q.question,'Hear the question'),q.question),opts,feedback);
@@ -1255,11 +1357,11 @@ function viewOrder(li){
       c.addEventListener('click',async()=>{
         if(k===filled){ SFX.chime(); c.classList.add('used'); const s=slotEls[k]; s.classList.add('filled'); s.innerHTML=''; s.append(h('span',{class:'sl'},labels[k]),h('span',{class:'se'},e),h('span',{class:'stx'},t)); filled++;
           await Voice.say(`${labels[k]}, ${t}.`); if(!v.isConnected) return;
-          if(filled===steps.length){ await wait(300); await Voice.say(steps.map((s2,j)=>`${labels[j]}, ${s2[1]}`).join('. ')+'.'); if(v.isConnected) finishScreen(body,'order',li,mistakes===0?3:mistakes<=2?2:1,start) } }
+          if(filled===steps.length){ await wait(300); await Voice.say(steps.map((s2,j)=>`${labels[j]}, ${s2[1]}.`)); if(v.isConnected) finishScreen(body,'order',li,mistakes===0?3:mistakes<=2?2:1,start) } }
         else{ mistakes++; SFX.soft(); c.classList.add('nudge'); setTimeout(()=>c.classList.remove('nudge'),520); Voice.say(`Hmm. What comes ${filled===0?'first':'next'}?`) } });
       pile.append(c) });
-    body.append(h('p',{class:'listenQ'},speakBtn(()=>`${title}. What comes ${filled===0?'first':'next'}?`,'Hear it'),'What comes first?'),slots,pile);
-    clearTimeout(timer); timer=setTimeout(()=>Voice.say(`${title}. What comes first?`),650) }
+    body.append(h('p',{class:'listenQ'},speakBtn(()=>[title,`What comes ${filled===0?'first':'next'}?`],'Hear it'),'What comes first?'),slots,pile);
+    clearTimeout(timer); timer=setTimeout(()=>Voice.say([title,'What comes first?']),650) }
   start(); cleanup=()=>clearTimeout(timer);
   return v }
 
@@ -1272,7 +1374,7 @@ function viewListen(li){
   function round(){
     const R=rounds[ri]; step=0; body.innerHTML='';
     const p=h('div',{class:'progress'}); rounds.forEach((_,k)=>p.append(h('i',{class:k<ri?'on':''})));
-    const qb=speakBtn(()=>R.say,'Hear it again');
+    const qb=speakBtn(()=>R.segs||R.say,'Hear it again');
     const grid=h('div',{class:'things',style:`--cols:${R.items.length<=4?R.items.length:R.items.length<=6?3:4}`});
     R.items.forEach(it=>{ const b=h('button',{class:'thing','aria-label':it[1]},it[0]);
       b.addEventListener('click',async()=>{
@@ -1280,10 +1382,10 @@ function viewListen(li){
         if(it===R.targets[step]){ step++; b.classList.add('ok'); if(R.targets.length>1) b.append(h('span',{class:'num'},step)); SFX.pop();
           if(step===R.targets.length){ SFX.chime(); await Voice.say(['Great listening!','You found it!','Yes! Well done!'][ri%3]); if(!v.isConnected) return; ri++;
             if(ri<rounds.length) round(); else finishScreen(body,'listen',li,mistakes===0?3:mistakes<=2?2:1,start) } }
-        else{ mistakes++; SFX.soft(); b.classList.add('nudge'); setTimeout(()=>b.classList.remove('nudge'),520); await Voice.say('Hmm, listen again.'); if(v.isConnected) Voice.say(R.say,{el:qb}) } });
+        else{ mistakes++; SFX.soft(); b.classList.add('nudge'); setTimeout(()=>b.classList.remove('nudge'),520); await Voice.say('Hmm, listen again.'); if(v.isConnected) Voice.say(R.segs||R.say,{el:qb}) } });
       grid.append(b) });
     body.append(p,h('p',{class:'listenQ'},qb,R.say),grid);
-    clearTimeout(timer); timer=setTimeout(()=>Voice.say(R.say,{el:qb}),650) }
+    clearTimeout(timer); timer=setTimeout(()=>Voice.say(R.segs||R.say,{el:qb}),650) }
   start(); cleanup=()=>clearTimeout(timer);
   return v }
 
@@ -1350,11 +1452,11 @@ function photoField(label,value,onChange){
   file.addEventListener('change',async()=>{ const f=file.files[0]; if(!f) return; try{ const url=await blobToDataURL(f); const img=await loadImg(url); const m=560, s=Math.min(1,m/Math.max(img.width,img.height)); const c=document.createElement('canvas'); c.width=Math.round(img.width*s); c.height=Math.round(img.height*s); c.getContext('2d').drawImage(img,0,0,c.width,c.height); cur=await Store.putMedia(c.toDataURL('image/jpeg',.8),'photo'); onChange(cur); draw() }catch(e){ toast('That photo could not be opened. Try a JPG or PNG.') } file.value='' });
   rm.addEventListener('click',()=>{ cur=null; onChange(null); draw() });
   return h('div',{class:'field'},h('span',null,label),h('div',{class:'media'},prev,h('button',{type:'button',class:'btn',onclick:()=>file.click()},'Add or take photo'),rm,file)) }
-function voiceField(label,value,onChange,sampleText){
+function voiceField(label,value,onChange,sampleText,emptyHint){
   let cur=value, rec=null, stopT=0; const status=h('span',{class:'muted'});
   const recBtn=h('button',{type:'button',class:'btn rec'},'● Record'), play=h('button',{type:'button',class:'btn'},'▶ Play'), rm=h('button',{type:'button',class:'btn warn'},'Remove');
   const file=h('input',{type:'file',accept:'audio/*',hidden:true}), up=h('button',{type:'button',class:'btn',onclick:()=>file.click()},'Upload a recording');
-  const draw=()=>{ play.disabled=!cur; rm.hidden=!cur; status.textContent=rec?'Recording… tap Stop when done (8 seconds max).':cur?'Your recording plays instead of the app voice.':(sampleText?'No recording yet. The voice buddy will say it.':'') }; draw();
+  const draw=()=>{ play.disabled=!cur; rm.hidden=!cur; status.textContent=rec?'Recording… tap Stop when done (8 seconds max).':cur?'Your recording plays instead of the app voice.':(emptyHint||(sampleText?'No recording yet. The voice buddy will say it.':'')) }; draw();
   async function keep(blob){ const url=await blobToDataURL(blob); if(url.length>240000){ toast('That recording is too long. Keep it under about 8 seconds.'); return } cur=await Store.putMedia(url,'audio'); onChange(cur); draw() }
   recBtn.addEventListener('click',async()=>{
     if(rec){ clearTimeout(stopT); rec.stop(); return }
@@ -1382,44 +1484,51 @@ function viewParent(){
   const save=async(msg)=>{ await Store.save(); if(msg) toast(msg) };
 
   function child(){
-    panel.append(h('h2',null,'Child & sounds'),h('p',{class:'muted'},'The name is used in cheers like “You did it!” and the hello on the home screen.'));
+    panel.append(h('h2',null,'Child & sounds'),h('p',{class:'muted'},'The name shows in the hello on the home screen. Record how you say it, and the buddies will use your recording in their cheers: “Zenji! You did it!”'));
     panel.append(textField('Child’s first name',cfg.childName,x=>{ cfg.childName=x.trim() }));
-    const spd=h('input',{type:'range',min:'0.7',max:'1.15',step:'0.05',value:String(cfg.speed||1)}); const spdOut=h('b',null,speedLabel(cfg.speed||1));
+    panel.append(voiceField('Your recording of the name (3 seconds is plenty)',cfg.nameAudio,x=>{ cfg.nameAudio=x; Store.later() },cfg.childName||'the name','No recording yet. The buddies will cheer without the name until you record it.'));
+    const spd=h('input',{type:'range',min:'0.85',max:'1.15',step:'0.05',value:String(cfg.speed||1)}); const spdOut=h('b',null,speedLabel(cfg.speed||1));
     spd.addEventListener('input',()=>{ cfg.speed=+spd.value; spdOut.textContent=speedLabel(cfg.speed) }); spd.addEventListener('change',()=>Voice.say('Hi! I want to play with you.'));
-    panel.append(h('h3',null,'Talking'),h('label',{class:'field'},h('span',null,'How fast the buddies talk: ',spdOut),spd),h('p',{class:'muted'},'Slower helps when words are new. The buddies themselves are in Voice buddies.'));
+    panel.append(h('h3',null,'Talking'),h('label',{class:'field'},h('span',null,'How fast the buddies talk: ',spdOut),spd),h('p',{class:'muted'},'A little slower helps when words are new. Who talks is set in Voice buddies.'));
     const vol=h('input',{type:'range',min:'0',max:'1',step:'0.05',value:String(cfg.musicVol==null?.5:cfg.musicVol)}); vol.addEventListener('input',()=>{ cfg.musicVol=+vol.value; Music.setVol() });
     panel.append(h('h3',null,'Sounds'),toggleField('Playful music on the home screen and level maps',cfg.music!==false,x=>{ cfg.music=x; x?Music.start():Music.stop() }),
       h('label',{class:'field'},h('span',null,'Music volume'),vol),
       toggleField('Soft tap and success sounds',cfg.sfx,x=>{ cfg.sfx=x }),toggleField('Calm corner music',cfg.calmSound,x=>{ cfg.calmSound=x }),toggleField('Calm corner voice guide',cfg.calmVoice,x=>{ cfg.calmVoice=x }));
     panel.append(h('div',{class:'sheetBar',style:'position:static'},h('button',{class:'btn primary',onclick:()=>save('Settings saved')},'Save settings'))) }
-  function speedLabel(x){ return x<.85?'slow':x<.95?'a little slow':x<1.05?'normal':'a little fast' }
+  function speedLabel(x){ return x<.9?'slow':x<.97?'a little slow':x<1.03?'normal':'a little fast' }
 
   function voices(){
     Voice.load();
-    const n=Voice.voices.length, best=Voice.best();
-    const status=Voice.works?h('div',{class:'status ok'},'✅ The voice is working on this tablet.'):
-      (Voice.fails<2&&Voice.has())?h('div',{class:'status'},'🔊 Tap “Test” on a buddy to check the voice.'):
-      h('div',{class:'status bad'},'🔇 The voice isn’t playing here. ',h('button',{class:'btn',onclick:voiceHelp},'Show me how to fix it'));
-    panel.append(h('h2',null,'Voice buddies'),h('p',{class:'muted'},'Three girls and two boys. Each one uses a voice from your tablet, tuned a little higher or lower. Keep pitch between about 0.85 and 1.25 for the most natural sound; further out, every voice starts to sound robotic.'),status);
-    if(n) panel.append(h('p',{class:'muted'},`This tablet has ${n} voice${n===1?'':'s'}. “Automatic” picks the most natural one${best?` (right now: ${best.name})`:''}. Want a nicer one? `,h('button',{class:'btn',onclick:voiceHelp},'How to get natural voices')));
+    const n=Voice.voices.length, best=Voice.best(), kok=Clips.enabled();
+    panel.append(h('h2',null,'Voice buddies'),h('p',{class:'muted'},'Every line in the games was recorded with Kokoro, a natural-sounding AI voice, so the buddies never sound robotic. Three girls and two boys. Anything you type yourself (new buttons, new stories, the name) is spoken by the tablet’s own voice, or by a recording you make.'));
+    panel.append(toggleField('Use the natural Kokoro voices (recommended)',kok,x=>{ cfg.kokoro=x; Store.later(); drawPanel(); if(x) loadPill(activeBuddy()) }));
     const grid=h('div',{class:'vcGrid'});
     const sys=Voice.voices.filter(x=>/^en/i.test(x.lang)).concat(Voice.voices.filter(x=>!/^en/i.test(x.lang))).sort((a,b)=>voiceQuality(b)-voiceQuality(a));
     cfg.voices.forEach(b=>{
       const on=b.id===cfg.activeVoice, card=h('div',{class:'vc'+(on?' on':'')});
       const nm=h('input',{type:'text',value:b.name,'aria-label':'Buddy name'}); nm.addEventListener('input',()=>{ b.name=nm.value||b.name; Store.later() });
-      const kind=h('div',{class:'chips',style:'margin-top:8px'}); const drawKind=()=>{ kind.innerHTML=''; [['girl','👧 Girl'],['boy','👦 Boy']].forEach(([k,l])=>kind.append(h('button',{type:'button','aria-pressed':String(b.kind===k),onclick:()=>{ b.kind=k; b.voiceURI=''; sel.value=''; drawKind(); Store.later() }},l))) };
-      const sel=h('select',{'aria-label':'Base voice'}); sel.append(h('option',{value:''},'Automatic '+(b.kind==='boy'?'boy':'girl')+' voice')); sys.forEach(x=>sel.append(h('option',{value:x.voiceURI},`${x.name} (${x.lang})${voiceQuality(x)>=5?' ★':''}`))); sel.value=b.voiceURI||'';
-      sel.addEventListener('change',()=>{ b.voiceURI=sel.value; Store.later(); Voice.say(`Hi! I’m ${b.name}.`,{buddy:b}) }); drawKind();
-      const slider=(lab,key,min,max,stp)=>{ const out=h('b',null,(+b[key]).toFixed(2)); const r=h('input',{type:'range',min,max,step:stp,value:String(b[key])}); r.addEventListener('input',()=>{ b[key]=+r.value; out.textContent=(+r.value).toFixed(2); Store.later() }); r.addEventListener('change',()=>Voice.say('Hi! I want to eat apples.',{buddy:b})); return h('label',{class:'sl'},h('span',null,lab,out),r) };
+      card.append(h('div',{class:'vh'},h('span',{class:'ve'},b.emoji),nm));
+      if(kok){
+        const st=Clips.status(b.pack); const pk=h('select',{'aria-label':'Kokoro voice'}); Object.entries(PACKS).forEach(([id,l])=>pk.append(h('option',{value:id},l))); pk.value=b.pack||'lily';
+        pk.addEventListener('change',()=>{ b.pack=pk.value; b.kokoro=PACKS[b.pack]; b.kind=/boy/.test(PACKS[b.pack])?'boy':'girl'; Store.later(); loadPill(b); Voice.say(buddyHello(b),{buddy:b}) });
+        card.append(h('label',{class:'sl'},h('span',null,'Kokoro voice'),pk),h('p',{class:'muted',style:'margin:6px 0 0'},st==='ready'?'✅ Ready on this tablet':st==='failed'?'⚠️ Voice pack not found. Upload the voices folder with the app.':st==='loading'?'⏳ Downloading…':'Downloads once, then works offline'));
+      } else {
+        const kind=h('div',{class:'chips',style:'margin-top:8px'}); const drawKind=()=>{ kind.innerHTML=''; [['girl','👧 Girl'],['boy','👦 Boy']].forEach(([k,l])=>kind.append(h('button',{type:'button','aria-pressed':String(b.kind===k),onclick:()=>{ b.kind=k; b.voiceURI=''; sel.value=''; drawKind(); Store.later() }},l))) };
+        const sel=h('select',{'aria-label':'Base voice'}); sel.append(h('option',{value:''},'Automatic '+(b.kind==='boy'?'boy':'girl')+' voice')); sys.forEach(x=>sel.append(h('option',{value:x.voiceURI},`${x.name} (${x.lang})${voiceQuality(x)>=5?' ★':''}`))); sel.value=b.voiceURI||'';
+        sel.addEventListener('change',()=>{ b.voiceURI=sel.value; Store.later(); Voice.tts(`Hi! I’m ${b.name}.`,{buddy:b}) }); drawKind();
+        const slider=(lab,key,min,max,stp)=>{ const out=h('b',null,(+b[key]).toFixed(2)); const r=h('input',{type:'range',min,max,step:stp,value:String(b[key])}); r.addEventListener('input',()=>{ b[key]=+r.value; out.textContent=(+r.value).toFixed(2); Store.later() }); r.addEventListener('change',()=>Voice.tts('Hi! I want to eat apples.',{buddy:b})); return h('label',{class:'sl'},h('span',null,lab,out),r) };
+        card.append(kind,sel,slider('Pitch','pitch',.7,1.4,.05),slider('Speed','rate',.7,1.25,.05));
+      }
       const actions=h('div',{class:'row',style:'margin-top:10px'},
-        h('button',{class:'btn',onclick:e=>Voice.say(`Hi! I’m ${b.name}. I want to eat apples. Can we play outside?`,{buddy:b,el:e.currentTarget}).then(()=>{ if(tab==='voices'&&Voice.works&&!panel.querySelector('.status.ok')) drawPanel() })},'▶ Test'),
-        on?h('span',{class:'btn primary'},'✓ In use'):h('button',{class:'btn primary',onclick:()=>{ cfg.activeVoice=b.id; Store.later(); drawPanel() }},'Use this voice'));
+        h('button',{class:'btn',onclick:e=>{ const txt=DEFAULT_VOICES.some(d=>d.name===b.name)?`Hi! I’m ${b.name}. I want to eat apples. Can we play outside?`:'Hi! I want to eat apples. Can we play outside?'; Voice.say(txt,{buddy:b,el:e.currentTarget}) }},'▶ Test'),
+        on?h('span',{class:'btn primary'},'✓ In use'):h('button',{class:'btn primary',onclick:()=>{ cfg.activeVoice=b.id; Store.later(); loadPill(b); drawPanel() }},'Use this voice'));
       if(!DEFAULT_VOICES.some(d=>d.id===b.id)) actions.append(h('button',{class:'btn warn',onclick:()=>{ cfg.voices=cfg.voices.filter(x=>x!==b); if(cfg.activeVoice===b.id) cfg.activeVoice=cfg.voices[0].id; Store.later(); drawPanel() }},'Remove'));
-      card.append(h('div',{class:'vh'},h('span',{class:'ve'},b.emoji),nm),kind,sel,slider('Pitch','pitch',.7,1.4,.05),slider('Speed','rate',.7,1.25,.05),actions);
-      grid.append(card) });
+      card.append(actions); grid.append(card) });
     panel.append(grid,h('div',{class:'row',style:'margin-top:14px'},
-      h('button',{class:'btn',onclick:()=>{ const em=['🐣','🐼','🦄','🐬','🐯','🐨','🦊'][cfg.voices.length%7]; cfg.voices.push({id:uid('v'),name:'Buddy '+(cfg.voices.length+1),kind:'girl',emoji:em,pitch:1.1,rate:.95,voiceURI:''}); Store.later(); drawPanel() }},'+ Add a voice'),
-      h('button',{class:'btn',onclick:()=>{ const keep=cfg.voices.filter(x=>!DEFAULT_VOICES.some(d=>d.id===x.id)); cfg.voices=clone(DEFAULT_VOICES).concat(keep); Store.later(); drawPanel(); toast('Voices reset') }},'Reset the 5 buddies'))) }
+      h('button',{class:'btn',onclick:()=>{ const em=['🐣','🐼','🦄','🐬','🐯','🐨','🦊'][cfg.voices.length%7]; const pack=['lily','leo','rosie','max','mia'][cfg.voices.length%5]; cfg.voices.push({id:uid('v'),name:'Buddy '+(cfg.voices.length+1),kind:/boy/.test(PACKS[pack])?'boy':'girl',emoji:em,pack,kokoro:PACKS[pack],pitch:1.1,rate:.95,voiceURI:''}); Store.later(); drawPanel() }},'+ Add a buddy'),
+      h('button',{class:'btn',onclick:()=>{ const keep=cfg.voices.filter(x=>!DEFAULT_VOICES.some(d=>d.id===x.id)); cfg.voices=clone(DEFAULT_VOICES).concat(keep); Store.later(); drawPanel(); toast('Voices reset') }},'Reset the 5 buddies')));
+    panel.append(h('h3',null,'Tablet voice (for words you add)'),h('p',{class:'muted'},`${n?`This tablet has ${n} voice${n===1?'':'s'}; the app picks the most natural one${best?` (right now: ${best.name})`:''}.`:'No tablet voices were found.'} Turn Kokoro off above to choose and tune the tablet voice per buddy. `,h('button',{class:'btn',onclick:voiceHelp},'How to get better tablet voices')),
+      Voice.fails>=2?h('div',{class:'status bad',style:'margin-top:8px'},'🔇 The tablet voice isn’t playing here, so words you add will be silent unless you record them.'):'') }
 
   function needs(){
     panel.append(h('h2',null,'What I mean buttons'),h('p',{class:'muted'},'Add photos of family, comfort items and routines, and record your own voice. Your recording plays instead of the voice buddy.'),
@@ -1517,7 +1626,7 @@ function viewParent(){
 
 /* ================= boot ================= */
 function onDataChanged(){ const cur=stage.lastElementChild; if(cur&&cur.classList.contains('home')&&!busy) show(viewHome()) }
-(async()=>{ await Store.load(); show(viewHome()) })();
+(async()=>{ await Store.load(); show(viewHome()); const b=activeBuddy(); if(b.pack&&Clips.enabled()){ loadPill(b) } })();
 if('serviceWorker' in navigator&&location.protocol==='https:'){ addEventListener('load',()=>navigator.serviceWorker.register('/sw.js').catch(()=>{})) }
 </script>
 </body>
