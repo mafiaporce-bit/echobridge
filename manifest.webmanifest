@@ -1,0 +1,14 @@
+{
+  "name": "EchoBridge",
+  "short_name": "EchoBridge",
+  "description": "A calm communication and language app for kids.",
+  "start_url": "/",
+  "display": "fullscreen",
+  "orientation": "landscape",
+  "background_color": "#EDF7FD",
+  "theme_color": "#EDF7FD",
+  "icons": [
+    { "src": "/icons/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any maskable" },
+    { "src": "/icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable" }
+  ]
+}
