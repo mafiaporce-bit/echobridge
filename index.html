@@ -7,8 +7,8 @@
 <meta name="description" content="EchoBridge: a calm communication and language app for kids.">
 <meta name="theme-color" content="#EDF7FD">
 <link rel="manifest" href="/manifest.webmanifest">
-<link rel="icon" href="/icons/icon-192.png" type="image/png">
-<link rel="apple-touch-icon" href="/icons/icon-192.png">
+<link rel="icon" href="/icon-192.png" type="image/png">
+<link rel="apple-touch-icon" href="/icon-192.png">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -515,7 +515,7 @@ const SFX={ctx:null,
 // Each buddy has a pack: voices/<pack>.json (hash -> [offset,length]) + voices/<pack>.bin (MP3 clips back to back).
 // Lines that are not in the pack (custom buttons, custom stories, names) fall back to the tablet's own voice or a parent recording.
 const Clips={
-  base:'voices/v1/', packs:{}, decoded:new Map(), playing:[], onProgress:null,
+  bases:['','voices/v1/'], base:'', packs:{}, decoded:new Map(), playing:[], onProgress:null,
   fnv(s){ let h=0x811c9dc5; for(const b of new TextEncoder().encode(s)){ h^=b; h=Math.imul(h,0x01000193)>>>0 } return h.toString(16).padStart(8,'0') },
   norm(t){ return String(t==null?'':t).replace(/\s+/g,' ').trim() },
   enabled(){ return cfg.kokoro!==false },
@@ -530,10 +530,13 @@ const Clips={
       const ac=new AbortController(); let stall=null; const poke=(ms)=>{ clearTimeout(stall); stall=setTimeout(()=>ac.abort(),ms) };
       try{
         poke(15000);   // no answer for 15 s -> give up, so the app never waits forever on a pack that will not come
-        const ir=await fetch(this.base+id+'.json',{cache:'force-cache',signal:ac.signal}); if(!ir.ok) throw new Error('no index');
+        // the packs may sit next to the app (flat upload) or in voices/v1/: use whichever answers
+        let ir=null, base='';
+        for(const bs of this.bases){ try{ const r0=await fetch(bs+id+'.json',{cache:'force-cache',signal:ac.signal}); if(r0.ok&&/json/.test(r0.headers.get('content-type')||'json')){ ir=r0; base=bs; break } }catch(e){ if(ac.signal.aborted) throw e } }
+        if(!ir) throw new Error('no index');
         p.index=(await ir.json()).h||{};
         poke(15000);
-        const r=await fetch(this.base+id+'.mp3',{cache:'force-cache',signal:ac.signal}); if(!r.ok) throw new Error('no pack');
+        const r=await fetch(base+id+'.mp3',{cache:'force-cache',signal:ac.signal}); if(!r.ok) throw new Error('no pack');
         const total=+r.headers.get('content-length')||0;
         if(r.body){ const reader=r.body.getReader(), chunks=[]; let got=0;
           for(;;){ poke(20000); const {done,value}=await reader.read(); if(done) break; chunks.push(value); got+=value.length; if(total){ p.progress=got/total; if(this.onProgress) this.onProgress(id,Math.min(.99,p.progress)) } }
