@@ -527,17 +527,24 @@ const Clips={
     if(p.ok) return Promise.resolve(true); if(p.failed) return Promise.resolve(false);
     if(p.loading) return p.loading;
     p.loading=(async()=>{
+      const ac=new AbortController(); let stall=null; const poke=(ms)=>{ clearTimeout(stall); stall=setTimeout(()=>ac.abort(),ms) };
       try{
-        const ir=await fetch(this.base+id+'.json',{cache:'force-cache'}); if(!ir.ok) throw new Error('no index');
+        poke(15000);   // no answer for 15 s -> give up, so the app never waits forever on a pack that will not come
+        const ir=await fetch(this.base+id+'.json',{cache:'force-cache',signal:ac.signal}); if(!ir.ok) throw new Error('no index');
         p.index=(await ir.json()).h||{};
-        const r=await fetch(this.base+id+'.mp3',{cache:'force-cache'}); if(!r.ok) throw new Error('no pack');
+        poke(15000);
+        const r=await fetch(this.base+id+'.mp3',{cache:'force-cache',signal:ac.signal}); if(!r.ok) throw new Error('no pack');
         const total=+r.headers.get('content-length')||0;
-        if(r.body&&total){ const reader=r.body.getReader(), chunks=[]; let got=0;
-          for(;;){ const {done,value}=await reader.read(); if(done) break; chunks.push(value); got+=value.length; p.progress=got/total; if(this.onProgress) this.onProgress(id,p.progress) }
+        if(r.body){ const reader=r.body.getReader(), chunks=[]; let got=0;
+          for(;;){ poke(20000); const {done,value}=await reader.read(); if(done) break; chunks.push(value); got+=value.length; if(total){ p.progress=got/total; if(this.onProgress) this.onProgress(id,Math.min(.99,p.progress)) } }
           const all=new Uint8Array(got); let o=0; for(const c of chunks){ all.set(c,o); o+=c.length } p.buf=all.buffer }
         else p.buf=await r.arrayBuffer();
+        // integrity: the file must be whole (a half-uploaded pack would play garbage or nothing)
+        let need=0; for(const k in p.index){ const e=p.index[k]; need=Math.max(need,e[0]+e[1]) }
+        if(p.buf.byteLength<need) throw new Error('pack incomplete: '+p.buf.byteLength+' of '+need+' bytes');
+        clearTimeout(stall);
         p.ok=true; p.progress=1; if(this.onProgress) this.onProgress(id,1); return true
-      }catch(e){ console.warn('voice pack unavailable',id,e); p.failed=true; if(this.onProgress) this.onProgress(id,-1); return false }
+      }catch(e){ clearTimeout(stall); console.warn('voice pack unavailable',id,e); p.failed=true; if(this.onProgress) this.onProgress(id,-1); return false }
       finally{ p.loading=null }
     })();
     return p.loading },
@@ -583,6 +590,48 @@ const Clips={
     }) }
 };
 
+/* ================= Live Kokoro: speaks anything that is not in the recorded packs (custom buttons, stories, names) ================= */
+// Same voices as the packs, generated on the tablet with kokoro-js. The model (~90 MB) downloads once, then is cached by the browser.
+const Live={
+  ids:{lily:'af_heart',mia:'bf_emma',rosie:'af_bella',leo:'am_puck',max:'am_michael'},
+  tts:null, state:'idle', token:0, audio:null, onState:null,
+  enabled(){ return cfg.live!==false },
+  set(s){ this.state=s; if(this.onState) this.onState(s) },
+  start(){
+    if(this.state==='ready') return Promise.resolve(true);
+    if(this.state==='loading') return this.p;
+    if(this.state==='failed') return Promise.resolve(false);
+    this.set('loading');
+    this.p=(async()=>{
+      try{
+        const {KokoroTTS}=await import('https://cdn.jsdelivr.net/npm/kokoro-js@1/+esm');
+        this.tts=await KokoroTTS.from_pretrained('onnx-community/Kokoro-82M-v1.0-ONNX',{dtype:'q8'});
+        this.set('ready'); return true
+      }catch(e){ console.warn('live Kokoro unavailable',e); this.set('failed'); return false }
+    })();
+    return this.p },
+  stop(){ this.token++; if(this.audio){ try{ this.audio.pause() }catch(e){} this.audio=null } },
+  // returns true when it spoke; false means "use the tablet voice instead"
+  async speak(text,pack){
+    const voice=this.ids[pack]; if(!voice) return false;
+    if(this.state!=='ready'){ this.start(); return false }      // first time: start downloading, tablet voice covers this line
+    const my=++this.token;
+    try{
+      const parts=Voice.sentences(text); const speed=clamp((cfg.speed||1)*.97,.8,1.2);
+      let next=this.tts.generate(parts[0],{voice,speed});
+      for(let i=0;i<parts.length;i++){
+        const a=await next; if(my!==this.token) return true;
+        if(i+1<parts.length) next=this.tts.generate(parts[i+1],{voice,speed});   // make the next sentence while this one plays
+        const url=URL.createObjectURL(a.toBlob()); const el=new Audio(url); this.audio=el;
+        await new Promise((res,rej)=>{ el.onended=res; el.onerror=rej; el.play().catch(rej) });
+        URL.revokeObjectURL(url); if(my!==this.token) return true;
+        if(i+1<parts.length) await new Promise(r=>setTimeout(r,160));
+      }
+      return true
+    }catch(e){ console.warn('live Kokoro failed',e); return false }
+  }
+};
+
 /* ================= voices: 5 buddies built on the device's speech engine ================= */
 // Gentle pitch/speed values: anything far from 1.0 makes a speech engine sound robotic.
 // pack = the Kokoro voice pack (natural recorded speech); pitch/rate only shape the tablet-voice fallback
@@ -623,7 +672,7 @@ const Voice={
   clean(t){ return String(t==null?'':t).replace(/[\u{1F000}-\u{1FAFF}\u{2600}-\u{27BF}\u{FE0F}\u{200D}]/gu,'').replace(/…/g,',').replace(/\s+/g,' ').trim() },
   // one utterance per sentence: engines pause naturally and never trip over long text
   sentences(t){ const s=this.clean(t); if(!s) return []; const parts=s.match(/[^.!?]+[.!?]+["”’)]*|[^.!?]+$/g)||[s]; return parts.map(p=>p.trim()).filter(Boolean) },
-  stop(){ Clips.stop(); try{ if(this.has()) speechSynthesis.cancel() }catch(e){} if(this.audio){ this.audio.pause(); this.audio=null } this.mark(null); Music.duck(false) },
+  stop(){ Clips.stop(); Live.stop(); try{ if(this.has()) speechSynthesis.cancel() }catch(e){} if(this.audio){ this.audio.pause(); this.audio=null } this.mark(null); Music.duck(false) },
   mark(el){ if(this.talkingEl) this.talkingEl.classList.remove('talking'); this.talkingEl=el; if(el) el.classList.add('talking') },
   say(text,opts={}){ return this._say(text,opts) },
   async _say(text,opts){
@@ -639,8 +688,13 @@ const Voice={
           const played=await Clips.play(b.pack,segs,{rate:cfg.speed||1});
           if(this.talkingEl===opts.el) this.mark(null); Music.duck(false); if(played) return } }
     }
-    // 2. fallback: the tablet's own speech engine
+    // 2. live Kokoro: the same voice, generated on the tablet for lines that are not recorded
     const flat=Array.isArray(text)?text.map(x=>typeof x==='string'?x:'').join(' '):text;
+    if(Live.enabled()&&b.pack&&Live.ids[b.pack]){ const t=this.clean(flat);
+      if(t){ if(opts.el) this.mark(opts.el); Music.duck(true);
+        const ok=await Live.speak(t,b.pack);
+        if(this.talkingEl===opts.el) this.mark(null); Music.duck(false); if(ok) return } }
+    // 3. last resort: the tablet's own speech engine
     return this.tts(flat,Object.assign({},opts,{buddy:b})) },
   tts(text,opts={}){
     const parts=this.sentences(text); if(!parts.length) return Promise.resolve();
@@ -1500,8 +1554,13 @@ function viewParent(){
   function voices(){
     Voice.load();
     const n=Voice.voices.length, best=Voice.best(), kok=Clips.enabled();
-    panel.append(h('h2',null,'Voice buddies'),h('p',{class:'muted'},'Every line in the games was recorded with Kokoro, a natural-sounding AI voice, so the buddies never sound robotic. Three girls and two boys. Anything you type yourself (new buttons, new stories, the name) is spoken by the tablet’s own voice, or by a recording you make.'));
+    panel.append(h('h2',null,'Voice buddies'),h('p',{class:'muted'},'Every line in the games was recorded with Kokoro, a natural-sounding AI voice, so the buddies never sound robotic. Three girls and two boys. Anything you type yourself (new buttons, new stories, the name) is spoken live by the same Kokoro voice, or by a recording you make.'));
     panel.append(toggleField('Use the natural Kokoro voices (recommended)',kok,x=>{ cfg.kokoro=x; Store.later(); drawPanel(); if(x) loadPill(activeBuddy()) }));
+    const liveRow=h('p',{class:'muted',style:'margin:-4px 0 12px'});
+    const drawLive=()=>{ const s=Live.state; liveRow.textContent=s==='ready'?'✅ Live voice is ready. Anything you type is spoken by the same Kokoro voice.':s==='loading'?'⏳ Getting the live voice (about 90 MB, once)…':s==='failed'?'⚠️ Live voice could not load (needs internet the first time). The tablet voice is used instead.':'Live voice not downloaded yet.' };
+    Live.onState=()=>{ if(liveRow.isConnected) drawLive() }; drawLive();
+    panel.append(toggleField('Live Kokoro voice for words you add (custom buttons, stories, names)',Live.enabled(),x=>{ cfg.live=x; Store.later(); if(x) Live.start(); else Live.stop(); drawPanel() }),liveRow);
+    if(Live.enabled()&&Live.state==='idle') panel.append(h('div',{class:'row',style:'margin-bottom:12px'},h('button',{class:'btn',onclick:()=>{ Live.start() }},'⬇ Get the live voice now (on wifi)')));
     const grid=h('div',{class:'vcGrid'});
     const sys=Voice.voices.filter(x=>/^en/i.test(x.lang)).concat(Voice.voices.filter(x=>!/^en/i.test(x.lang))).sort((a,b)=>voiceQuality(b)-voiceQuality(a));
     cfg.voices.forEach(b=>{
