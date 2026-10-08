@@ -590,6 +590,32 @@ input,textarea,select{font:inherit;color:var(--ink)}
 @media (max-width:600px){ .opts.four .opt{min-height:120px} .opts.four .opt .oe{width:64px;height:64px;font-size:40px} }
 @media (max-height:520px){ .opts.four{gap:8px} .opts.four .opt{min-height:96px;padding:8px} .opts.four .opt .oe{width:50px;height:50px;font-size:32px} }
 
+/* counting: many small pictures in a neat grid */
+.scene .emo.many{display:grid;grid-template-columns:repeat(min(var(--n),5),auto);gap:6px 10px;font-size:clamp(34px,6.5vh,62px);justify-content:center}
+.scene .emo.many span{animation-duration:.35s}
+.scene .emo.many span:nth-child(n){animation-delay:calc(var(--i,0)*.05s)}
+/* memory match */
+.memGrid{display:grid;grid-template-columns:repeat(var(--cols),minmax(0,150px));gap:14px;justify-content:center;max-width:900px;margin:0 auto}
+.mcard{position:relative;aspect-ratio:1;border-radius:24px;background:linear-gradient(160deg,#9FD3FF,#C9B8FF);box-shadow:0 6px 0 rgba(0,0,0,.08);font-size:clamp(40px,8vh,70px);display:grid;place-items:center;border:5px solid #fff;transition:transform .25s,background .25s}
+.mcard .mface{display:none}.mcard .mback{font-size:.6em;opacity:.85}
+.mcard.up{background:var(--card);transform:rotateY(0) scale(1.03)}
+.mcard.up .mface{display:block}.mcard.up .mback{display:none}
+.mcard.got{border-color:var(--green);background:var(--greenSoft)}
+@media (max-width:600px){ .memGrid{gap:9px;grid-template-columns:repeat(min(var(--cols),3),minmax(0,110px))} .mcard{border-radius:18px;border-width:4px} }
+@media (max-height:520px){ .memGrid{grid-template-columns:repeat(var(--cols),minmax(0,92px));gap:8px} .mcard{font-size:38px} }
+/* my turn, your turn */
+.turnWrap{display:flex;flex-direction:column;align-items:center;gap:12px;max-width:700px;margin:0 auto}
+.turnWho{font-size:clamp(22px,3.6vh,32px);font-weight:800;padding:.3em 1em .2em;border-radius:99px;background:var(--card);box-shadow:0 4px 12px var(--shadow)}
+.turnWho.c{background:#FFF2B8}
+.towerBox{min-height:min(46vh,420px);width:220px;display:flex;align-items:flex-end;justify-content:center;border-bottom:8px solid #9BC58F;border-radius:6px}
+.tower{display:flex;flex-direction:column;gap:4px;align-items:center}
+.tblock{width:150px;height:min(5.4vh,44px);border-radius:12px;box-shadow:inset 0 -6px 0 rgba(0,0,0,.12);display:grid;place-items:center;font-size:min(3.6vh,28px);animation:popIn .35s}
+.goal{font-weight:700;color:var(--ink2);font-size:18px}
+.turnPile{display:flex;gap:14px;flex-wrap:wrap;justify-content:center}
+.tbtn{min-width:120px;height:84px;border-radius:24px;background:var(--card);box-shadow:0 6px 0 rgba(0,0,0,.1);font-size:24px;font-weight:800;padding:0 22px;border:5px solid #fff}
+.tbtn:active{transform:translateY(3px)}
+@media (max-height:520px){ .towerBox{min-height:46vh;width:170px} .tblock{width:120px;height:4.6vh;font-size:3.6vh} .turnWrap{flex-direction:row;flex-wrap:wrap;justify-content:center;gap:10px} .tbtn{height:64px;min-width:90px;font-size:19px} }
+
 @media (prefers-reduced-motion:reduce){
   *,*::before,*::after{animation-duration:.01ms!important;animation-iteration-count:1!important;transition-duration:.01ms!important}
   .bg .critter{animation:none!important}
@@ -1446,6 +1472,174 @@ const FEATS=[
   {id:'iyou',title:'I or you?',art:'iyou',color:'#E3F6EF',levels:()=>IY.map((x,i)=>({name:x[1]+'…',emoji:x[2][0][0]})),qs:li=>iyQuestions(li)}
 ];
 const feat=id=>FEATS.find(f=>f.id===id);
+/* ================= THE LAST FIVE GAMES: Colors & shapes, Big or small, Count with me (quiz engine) + Memory match, My turn, your turn (own engines) ================= */
+const cap=s=>s.charAt(0).toUpperCase()+s.slice(1);
+const pickOpts=(right,wrongs,why)=>[right,...wrongs].map((o,i)=>({emoji:o[0],text:o[1],correct:i===0,why:i===0?(why||`Yes! ${o[1]}.`):`Hmm, not ${o[1].charAt(0).toLowerCase()+o[1].slice(1)}.`,whySay:i===0?['Yes!',why?why.replace(/^Yes! /,''):o[1]]:['Hmm, not',o[1]]}));
+
+/* ---- Colors & shapes ---- */
+const COL={red:['🔴','Red'],blue:['🔵','Blue'],yellow:['🟡','Yellow'],green:['🟢','Green'],orange:['🟠','Orange'],purple:['🟣','Purple'],brown:['🟤','Brown'],black:['⚫','Black'],white:['⚪','White']};
+const SHP={circle:['⚪','Circle'],square:['⬜','Square'],triangle:['🔺','Triangle'],star:['⭐','Star'],heart:['❤️','Heart'],diamond:['🔷','Diamond'],moon:['🌙','Moon']};
+const THINGCOL=[['🍎','apple','red'],['🍌','banana','yellow'],['🥦','broccoli','green'],['🍊','orange','orange'],['🍇','grapes','purple'],['🫐','blueberries','blue'],['🐸','frog','green'],['🐥','chick','yellow'],['🍓','strawberry','red'],['🐳','whale','blue'],['🍆','eggplant','purple'],['🥕','carrot','orange']];
+// level: [name, emoji, [ [kind, target, wrong1, wrong2, wrong3] x3 ]]  kind c=colour, s=shape, t=thing colour
+const CS=[
+  ['Red, blue, yellow','🔴',[['c','red','blue','yellow','green'],['c','blue','red','green','yellow'],['c','yellow','green','red','blue']]],
+  ['Green and more','🟢',[['c','green','yellow','blue','red'],['c','red','green','yellow','blue'],['c','blue','yellow','red','green']]],
+  ['Orange and purple','🟠',[['c','orange','purple','red','yellow'],['c','purple','blue','orange','green'],['c','orange','yellow','red','purple']]],
+  ['Brown, black, white','🟤',[['c','brown','black','white','orange'],['c','black','brown','white','purple'],['c','white','black','yellow','brown']]],
+  ['All the colors','🌈',[['c','purple','orange','green','brown'],['c','green','blue','black','white'],['c','red','orange','purple','brown']]],
+  ['Circle and square','⚪',[['s','circle','square','triangle','star'],['s','square','circle','heart','triangle'],['s','circle','star','square','moon']]],
+  ['Triangle and star','🔺',[['s','triangle','circle','square','heart'],['s','star','triangle','moon','circle'],['s','triangle','star','heart','square']]],
+  ['Heart and moon','❤️',[['s','heart','star','circle','moon'],['s','moon','heart','triangle','square'],['s','heart','diamond','moon','star']]],
+  ['Diamond','🔷',[['s','diamond','square','triangle','circle'],['s','diamond','heart','star','moon'],['s','star','diamond','circle','heart']]],
+  ['All the shapes','⭐',[['s','moon','star','diamond','heart'],['s','square','diamond','circle','triangle'],['s','heart','moon','triangle','star']]],
+  ['Color of fruit','🍎',[['t',0,1,2,5],['t',1,0,3,4],['t',2,4,0,3]]],
+  ['Color of food','🥕',[['t',11,2,5,10],['t',4,1,8,2],['t',10,3,11,7]]],
+  ['Color of animals','🐸',[['t',6,7,9,0],['t',7,6,9,3],['t',9,6,7,8]]],
+  ['Mixed colors','🎨',[['c','purple','green','orange','blue'],['t',8,5,6,1],['c','brown','yellow','blue','white']]],
+  ['Colors and shapes','🎲',[['s','star','heart','circle','moon'],['c','orange','blue','green','black'],['t',3,2,9,6]]]
+];
+function csQs(li){ const [,,qs]=CS[li]; return qs.map(([k,a,...w])=>{
+  if(k==='c'){ const T=COL[a]; return {text:'',emojis:'🎨',question:`Tap ${a}.`,four:true,options:pickOpts(T,w.map(x=>COL[x]),`Yes! That is ${a}.`)} }
+  if(k==='s'){ const T=SHP[a]; return {text:'',emojis:'🔷',question:`Tap the ${a}.`,four:true,options:pickOpts(T,w.map(x=>SHP[x]),`Yes! That is a ${a}.`)} }
+  const t=THINGCOL[a]; const colours=[t[2],...w.map(i=>THINGCOL[i][2])].filter((c,i,arr)=>arr.indexOf(c)===i);
+  const fill=Object.keys(COL).filter(c=>!colours.includes(c)); while(colours.length<4) colours.push(fill.shift());
+  return {text:'',emojis:t[0],caption:cap(t[1]),question:`What color is the ${t[1]}?`,four:true,options:pickOpts(COL[t[2]],colours.slice(1).map(c=>COL[c]),`Yes! The ${t[1]} is ${t[2]}.`)} }).map(q=>Object.assign({fx:null,photo:null},q)) }
+
+/* ---- Big or small ---- */
+// [question, right, wrong(s)...]
+const BIG=[
+  ['Big animals','🐘',[['Which one is bigger?',['🐘','Elephant'],['🐭','Mouse']],['Which one is bigger?',['🐻','Bear'],['🐝','Bee']],['Which one is bigger?',['🦒','Giraffe'],['🐰','Bunny']]]],
+  ['Small animals','🐭',[['Which one is smaller?',['🐜','Ant'],['🐶','Dog']],['Which one is smaller?',['🐞','Ladybug'],['🐴','Horse']],['Which one is smaller?',['🐣','Chick'],['🐄','Cow']]]],
+  ['Big things','🏠',[['Which one is bigger?',['🏠','House'],['🔑','Key']],['Which one is bigger?',['🚌','Bus'],['🍪','Cookie']],['Which one is bigger?',['🌳','Tree'],['🌸','Flower']]]],
+  ['Small things','🔑',[['Which one is smaller?',['🪙','Coin'],['🚗','Car']],['Which one is smaller?',['✏️','Pencil'],['🛏️','Bed']],['Which one is smaller?',['🍇','Grape'],['🍉','Watermelon']]]],
+  ['Big or small?','⚖️',[['Which one is bigger?',['🐳','Whale'],['🐟','Fish']],['Which one is smaller?',['🐁','Mouse'],['🐈','Cat']],['Which one is bigger?',['⛰️','Mountain'],['🪨','Rock']]]],
+  ['Tall','🦒',[['Which one is taller?',['🦒','Giraffe'],['🐕','Dog']],['Which one is taller?',['🏢','Building'],['🏠','House']],['Which one is taller?',['🌴','Palm tree'],['🌷','Tulip']]]],
+  ['Short','🐢',[['Which one is shorter?',['🐢','Turtle'],['🦒','Giraffe']],['Which one is shorter?',['🧒','Kid'],['🧑','Grown-up']],['Which one is shorter?',['🌱','Sprout'],['🌳','Tree']]]],
+  ['Heavy','🪨',[['Which one is heavier?',['🐘','Elephant'],['🪶','Feather']],['Which one is heavier?',['🚗','Car'],['🎈','Balloon']],['Which one is heavier?',['🪨','Rock'],['🍃','Leaf']]]],
+  ['Light','🪶',[['Which one is lighter?',['🪶','Feather'],['🧱','Brick']],['Which one is lighter?',['🎈','Balloon'],['🚌','Bus']],['Which one is lighter?',['🍃','Leaf'],['🐘','Elephant']]]],
+  ['Long','🐍',[['Which one is longer?',['🐍','Snake'],['🐛','Worm']],['Which one is longer?',['🚂','Train'],['🚲','Bike']],['Which one is longer?',['🦒','Giraffe neck'],['🐭','Mouse ear']]]],
+  ['The biggest','🐋',[['Which one is the biggest?',['🐋','Whale'],['🐟','Fish'],['🦐','Shrimp']],['Which one is the biggest?',['🐘','Elephant'],['🐕','Dog'],['🐁','Mouse']],['Which one is the biggest?',['🌳','Tree'],['🌿','Bush'],['🌱','Sprout']]]],
+  ['The smallest','🐜',[['Which one is the smallest?',['🐜','Ant'],['🐈','Cat'],['🐎','Horse']],['Which one is the smallest?',['🫐','Blueberry'],['🍎','Apple'],['🍉','Watermelon']],['Which one is the smallest?',['🐣','Chick'],['🐔','Hen'],['🦃','Turkey']]]],
+  ['Big and little','🧸',[['Which one is bigger?',['🧑','Dad'],['👶','Baby']],['Which one is smaller?',['👶','Baby'],['👩','Mom']],['Which one is bigger?',['🛏️','Bed'],['🧸','Teddy bear']]]],
+  ['Sky and ground','✈️',[['Which one is bigger?',['✈️','Plane'],['🦋','Butterfly']],['Which one is smaller?',['🐦','Bird'],['🚁','Helicopter']],['Which one is bigger?',['☀️','Sun'],['⭐','Small star']]]],
+  ['Mixed up','🎲',[['Which one is the biggest?',['🦕','Dinosaur'],['🐊','Crocodile'],['🦎','Lizard']],['Which one is the smallest?',['🐞','Ladybug'],['🐸','Frog'],['🐕','Dog']],['Which one is taller?',['🦒','Giraffe'],['🐘','Elephant']]]]
+];
+function bigQs(li){ const [,,qs]=BIG[li]; return qs.map(([q,r,...w])=>({text:'',emojis:'⚖️',question:q,fx:null,photo:null,two:w.length===1,options:pickOpts(r,w,`Yes! The ${r[1].toLowerCase()}.`)})) }
+
+/* ---- Count with me ---- */
+const NUMW=['Zero','One','Two','Three','Four','Five','Six','Seven','Eight','Nine','Ten'], NUME=['0️⃣','1️⃣','2️⃣','3️⃣','4️⃣','5️⃣','6️⃣','7️⃣','8️⃣','9️⃣','🔟'];
+const CNT_ITEMS=[['🍎','apple','apples'],['⭐','star','stars'],['🐶','dog','dogs'],['🎈','balloon','balloons'],['🐟','fish','fish'],['🍪','cookie','cookies'],['🚗','car','cars'],['🌸','flower','flowers'],['🦆','duck','ducks'],['⚽','ball','balls']];
+// level: [name, emoji, [ [item index, how many, wrong, wrong] x3 ]]
+const CNT=[
+  ['Count to 2','1️⃣',[[0,1,2,3],[1,2,1,3],[2,1,3,2]]],
+  ['Count to 3','2️⃣',[[3,3,2,1],[4,2,3,1],[5,3,1,2]]],
+  ['Count to 3 again','3️⃣',[[6,2,3,1],[7,3,2,4],[8,1,2,3]]],
+  ['Count to 4','4️⃣',[[9,4,3,2],[0,3,4,5],[1,4,2,5]]],
+  ['Count to 5','5️⃣',[[2,5,4,3],[3,4,5,3],[4,5,3,4]]],
+  ['Count to 5 again','🖐️',[[5,2,5,4],[6,5,3,4],[7,4,5,2]]],
+  ['Count to 6','6️⃣',[[8,6,5,4],[9,5,6,3],[0,6,4,5]]],
+  ['Count to 7','7️⃣',[[1,7,6,5],[2,6,7,4],[3,7,5,6]]],
+  ['Count to 7 again','🎈',[[4,5,7,6],[5,7,6,4],[6,6,5,7]]],
+  ['Count to 8','8️⃣',[[7,8,7,6],[8,7,8,5],[9,8,6,7]]],
+  ['Count to 9','9️⃣',[[0,9,8,7],[1,8,9,6],[2,9,7,8]]],
+  ['Count to 10','🔟',[[3,10,9,8],[4,9,10,7],[5,10,8,9]]],
+  ['Big counting','💯',[[6,8,10,9],[7,10,9,6],[8,9,7,10]]],
+  ['Count it all','🧮',[[9,6,8,7],[0,10,8,9],[1,7,9,6]]],
+  ['Counting star','🌟',[[2,4,6,5],[3,9,10,8],[4,10,7,9]]]
+];
+function cntQs(li){ const [,,qs]=CNT[li]; return qs.map(([it,n,...w])=>{ const [e,,pl]=CNT_ITEMS[it];
+  return {text:'',emojis:e,many:[e,n],question:`How many ${pl}?`,fx:null,photo:null,four:false,options:pickOpts([NUME[n],NUMW[n]],w.map(x=>[NUME[x],NUMW[x]]),`Yes! ${NUMW[n]} ${n===1?CNT_ITEMS[it][1]:pl}.`)} }) }
+
+/* ---- Memory match (own engine) ---- */
+const MEM_SETS=[
+  ['Animals','🐶',[['🐶','A dog'],['🐱','A cat'],['🐄','A cow'],['🐸','A frog'],['🐷','A pig'],['🐔','A chicken']]],
+  ['Fruit','🍎',[['🍎','An apple'],['🍌','A banana'],['🍇','Grapes'],['🍓','A strawberry'],['🍊','An orange'],['🍉','Watermelon']]],
+  ['Toys','🧸',[['🧸','A teddy bear'],['⚽','A ball'],['🪁','A kite'],['🧱','A block'],['🎈','A balloon'],['🚂','A toy train']]],
+  ['Things that go','🚗',[['🚗','A car'],['🚌','A bus'],['🚲','A bike'],['✈️','A plane'],['⛵','A boat'],['🚂','A train']]],
+  ['Faces','😊',[['😊','Happy'],['😢','Sad'],['😠','Angry'],['😴','Sleepy'],['😮','Surprised'],['🤪','Silly']]]
+];
+const MEM_LV=[[0,2],[1,2],[2,2],[3,3],[4,3],[0,3],[1,4],[2,4],[3,4],[4,5],[0,5],[1,5],[2,6],[3,6],[4,6]];
+function viewMemory(li){
+  const [si,pairs]=MEM_LV[li], [setName,,items]=MEM_SETS[si];
+  const v=makeView('quiet'); levelHeader(v,'memory',li,`Memory match ${li+1}`);
+  const body=h('div',{class:'body'}); v.append(body);
+  let first=null, lock=false, found=0, misses=0, finished=false, timer=0;
+  function start(){
+    body.innerHTML=''; first=null; lock=false; found=0; misses=0; finished=false;
+    const deck=shuffle(items.slice(0,pairs).flatMap((it,k)=>[[k,it],[k,it]]));
+    const cols=deck.length<=4?2:deck.length<=6?3:deck.length<=8?4:deck.length<=10?5:4;
+    const grid=h('div',{class:'memGrid',style:`--cols:${cols}`});
+    deck.forEach(([k,it])=>{ const c=h('button',{class:'mcard','data-k':String(k),'aria-label':'Card'},h('span',{class:'mback','aria-hidden':'true'},'⭐'),h('span',{class:'mface'},it[0]));
+      c.addEventListener('click',()=>flip(c,k,it)); grid.append(c) });
+    body.append(h('p',{class:'listenQ'},speakBtn(()=>'Find the two that match.','Hear it'),'Find the two that match.'),grid);
+    clearTimeout(timer); timer=setTimeout(()=>Voice.say('Find the two that match.'),650) }
+  async function flip(c,k,it){
+    if(lock||c.classList.contains('up')||finished) return;
+    SFX.pop(); c.classList.add('up'); Voice.say(it[1]);
+    if(!first){ first={c,k}; return }
+    const a=first; first=null;
+    if(a.k===k){ found++; a.c.classList.add('got'); c.classList.add('got'); SFX.chime();
+      if(found===pairs){ finished=true; await wait(700); if(!v.isConnected) return; await Voice.say('Yes! A match!'); if(v.isConnected) finishScreen(body,'memory',li,misses<=pairs?3:misses<=pairs*2?2:1,start) }
+      else{ await wait(500); if(v.isConnected) Voice.say('Yes! A match!') } }
+    else{ misses++; lock=true; await wait(1000); if(!v.isConnected) return; a.c.classList.remove('up'); c.classList.remove('up'); lock=false; Voice.say('Hmm, not a match.') } }
+  start(); cleanup=()=>clearTimeout(timer);
+  return v }
+
+/* ---- My turn, your turn (own engine) ---- */
+const TCOL={red:'#FF6B6B',blue:'#4DA3FF',yellow:'#FFD54A',green:'#5CCB6E'};
+const TURN_LV=range(15).map(i=>i<7?{n:4+i,copy:0}:{n:4+(i-7)%4*2,copy:i<11?2:3});
+function viewTurns(li){
+  const L=TURN_LV[li], buddy=activeBuddy();
+  const v=makeView('quiet'); levelHeader(v,'turns',li,`My turn, your turn ${li+1}`);
+  const body=h('div',{class:'body'}); v.append(body);
+  let turn='buddy', placed=0, mistakes=0, want=null, finished=false, timer=0;
+  const tower=h('div',{class:'tower'}), who=h('div',{class:'turnWho'}), pile=h('div',{class:'turnPile'});
+  function setWho(t){ turn=t; who.textContent=t==='buddy'?`${buddy.emoji} ${buddy.name}’s turn`:'🧒 Your turn'; who.className='turnWho '+(t==='buddy'?'b':'c'); v.dataset.turn=t; v.dataset.want=want||'' }
+  function addBlock(color,mine){ const b=h('div',{class:'tblock',style:`background:${TCOL[color]}`},h('span',null,mine?'🧒':buddy.emoji)); tower.prepend(b); placed++ }
+  function start(){
+    body.innerHTML=''; tower.innerHTML=''; pile.innerHTML=''; placed=0; mistakes=0; finished=false; want=null;
+    const colors=L.copy?Object.keys(TCOL).slice(0,Math.max(2,L.copy)):['any'];
+    colors.forEach(c=>{ const b=h('button',{class:'tbtn','data-color':c,style:c==='any'?'':`background:${TCOL[c]}`,'aria-label':c==='any'?'Add my block':c+' block'},c==='any'?'🧱 Add my block':''); b.addEventListener('click',()=>tap(c)); pile.append(b) });
+    body.append(h('div',{class:'turnWrap'},who,h('div',{class:'towerBox'},tower),h('div',{class:'goal'},`${L.n} blocks`),pile));
+    setWho('buddy'); clearTimeout(timer); timer=setTimeout(async()=>{ await Voice.say('Let’s take turns.'); if(v.isConnected) buddyTurn() },650) }
+  async function buddyTurn(){
+    if(!v.isConnected||finished) return; setWho('buddy'); await wait(400); if(!v.isConnected) return;
+    await Voice.say('My turn!'); if(!v.isConnected) return;
+    const keys=Object.keys(TCOL).slice(0,L.copy?Math.max(2,L.copy):4); const color=keys[placed%keys.length===0?0:Math.floor(Math.random()*keys.length)];
+    addBlock(color,false); SFX.pop();
+    if(placed>=L.n) return done();
+    want=L.copy?color:null; await wait(350); if(!v.isConnected) return;
+    setWho('child'); Voice.say(L.copy?`Your turn! Find a ${color} block.`:'Your turn!') }
+  async function tap(c){
+    if(finished) return;
+    if(turn!=='child'){ mistakes++; SFX.soft(); Voice.say('Wait, it is my turn.'); return }
+    if(L.copy&&c!==want){ mistakes++; SFX.soft(); Voice.say(`Hmm, find a ${want} block.`); return }
+    addBlock(c==='any'?Object.keys(TCOL)[placed%4]:c,true); SFX.chime(); setWho('buddy');
+    if(placed>=L.n) return done();
+    await Voice.say('Great!'); if(v.isConnected) buddyTurn() }
+  async function done(){ if(finished) return; finished=true; setWho('buddy'); await wait(300); if(!v.isConnected) return; await Voice.say('We did it together!'); if(v.isConnected) finishScreen(body,'turns',li,mistakes===0?3:mistakes<=2?2:1,start) }
+  start(); cleanup=()=>{ clearTimeout(timer); finished=true };
+  return v }
+
+FEATS.push(
+  {id:'colors',title:'Colors & shapes',art:'colors',color:'#FFE9F2',levels:()=>CS.map(x=>({name:x[0],emoji:x[1]})),qs:li=>csQs(li)},
+  {id:'big',title:'Big or small',art:'big',color:'#E9F6E1',levels:()=>BIG.map(x=>({name:x[0],emoji:x[1]})),qs:li=>bigQs(li)},
+  {id:'count',title:'Count with me',art:'count',color:'#FFF3D9',levels:()=>CNT.map(x=>({name:x[0],emoji:x[1]})),qs:li=>cntQs(li)},
+  {id:'memory',title:'Memory match',art:'memory',color:'#E8EEFF',levels:()=>MEM_LV.map(([s,p])=>({name:`${MEM_SETS[s][0]}, ${p} pairs`,emoji:MEM_SETS[s][1]})),play:li=>viewMemory(li)},
+  {id:'turns',title:'My turn, your turn',art:'turns',color:'#E2F6F4',levels:()=>TURN_LV.map(L=>({name:L.copy?'Copy my color':'Build a tower',emoji:L.copy?'🎨':'🧱'})),play:li=>viewTurns(li)}
+);
+Object.assign(ART,{
+  colors:emojiArt('#FFD3E5','#FFF0F6','🎨','🔷'), big:emojiArt('#CFEFC2','#EEFAE8','🐘','🐭'), count:emojiArt('#FFE6AE','#FFF8E6','🔢','🍎'),
+  memory:emojiArt('#D6E0FF','#F0F4FF','🃏','⭐'), turns:emojiArt('#C3EEE9','#EAFAF8','🧱','🔁')
+});
+function LINES3(){ const out=new Set(); const add=t=>{ if(typeof t==='string'&&t.trim()) out.add(t.trim()) };
+  for(const F of FEATS.filter(f=>['colors','big','count','memory','turns'].includes(f.id))){ add(F.title); F.levels().forEach(L=>{ add(L.name); }); add(`${F.title} 1`);
+    if(F.qs) for(let li=0;li<15;li++) for(const q of F.qs(li)){ add(q.text); add(q.question); add(q.caption); for(const o of q.options){ add(o.text); (o.whySay||[]).forEach(add) } } }
+  MEM_SETS.forEach(s=>s[2].forEach(it=>add(it[1])));
+  ['Find the two that match.','Yes! A match!','Hmm, not a match.','Let’s take turns.','My turn!','Your turn!','Wait, it is my turn.','Great!','We did it together!'].forEach(add);
+  Object.keys(TCOL).forEach(c=>{ add(`Your turn! Find a ${c} block.`); add(`Hmm, find a ${c} block.`) });
+  return [...out] }
+
 /* ================= FIVE MORE GAMES (quiz engine): Odd one out, Opposites, Finish the sentence, What do you say?, Rhyme time ================= */
 // Every option speaks its own short clip, so a new game needs only its questions and words recorded.
 const YES_IS=['Yes!'], NOT_=['Hmm, not'];
@@ -1683,12 +1877,12 @@ function viewQuiz(fid,li){
     const q=qs[i]; locked=false; body.innerHTML='';
     const scene=h('div',{class:'scene'+(q.say||q.caption?' hasSay':'')});
     if(q.photo){ const im=mediaImg(q.photo,q.text); im.classList.add('photo'); scene.append(im) }
-    else{ scene.append(h('div',{class:'ground'})); const emo=h('div',{class:'emo'}); splitEmoji(q.emojis||'⭐').slice(0,3).forEach(e=>emo.append(h('span',null,e))); scene.append(emo) }
+    else{ scene.append(h('div',{class:'ground'})); const emo=h('div',{class:'emo'}); if(q.many){ emo.classList.add('many'); emo.style.setProperty('--n',q.many[1]); for(let k=0;k<q.many[1];k++) emo.append(h('span',null,q.many[0])) } else splitEmoji(q.emojis||'⭐').slice(0,3).forEach(e=>emo.append(h('span',null,e))); scene.append(emo) }
     if(q.say||q.caption) scene.append(h('div',{class:'say'},q.say||q.caption));
     if(q.fx){ const fx=h('div',{class:'fx '+q.fx}); const n=q.fx==='heart'?1:3; for(let k=0;k<n;k++) fx.append(h('i',null,q.fx==='heart'?'💗':q.fx==='sparkle'?'✨':'')); scene.append(fx) }
     const left=h('div',null,progress(),scene);
     if(q.text) left.append(h('p',{class:'sceneText'},speakBtn(()=>q.text,'Hear it again'),q.text));
-    const opts=h('div',{class:'opts'+(q.yesno?' two':'')+(q.faces?' faces':'')+(q.four?' four':'')}); const feedback=h('div');
+    const opts=h('div',{class:'opts'+(q.yesno?' two':'')+(q.faces?' faces':'')+(q.four?' four':'')+(q.two?' two':'')}); const feedback=h('div');
     const list=q.yesno?q.options:shuffle(q.options.filter(o=>o.text));
     list.forEach(o=>{
       const card=h('div',{class:'opt',role:'button',tabindex:'0','aria-label':o.text},h('span',{class:'oe'},o.emoji||'•'),h('span',{class:'ot'},o.text),speakBtn(()=>o.text,'Hear '+o.text));
