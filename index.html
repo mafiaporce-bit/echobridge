@@ -551,6 +551,51 @@ input,textarea,select{font:inherit;color:var(--ink)}
   .panel{padding:14px 14px}
 }
 
+/* ---------- star-shaped categories on the home screen ---------- */
+.tile .rim,.tile .art{clip-path:var(--star)}
+.tile .art{inset:5.5%;background:#BFE4FA}
+.tile .tlabel{bottom:13%}
+.tile{filter:drop-shadow(0 8px 10px rgba(40,110,160,.22))}
+/* ---------- bright daytime sky with a sun ---------- */
+:root:not([data-theme="dark"]) .view{background:linear-gradient(180deg,#8FD3FF 0%,#B9E4FF 30%,#E2F4FF 58%,#F4FBF7 78%,var(--meadow) 100%)}
+.bg .sun{position:absolute;top:calc(8px + 3vh);right:max(230px,22vw);width:clamp(84px,15vh,150px);aspect-ratio:1;z-index:0}
+.bg .sun svg{width:100%;height:100%;display:block;filter:drop-shadow(0 0 22px rgba(255,214,90,.75))}
+.bg .sun .rays{transform-origin:100px 100px;animation:sunspin 60s linear infinite}
+@keyframes sunspin{to{transform:rotate(360deg)}}
+.view.quiet .bg .sun{opacity:.85}
+@media (max-width:600px){ .bg .sun{right:auto;left:42%;top:calc(96px + 2vh);width:78px} }
+@media (max-height:520px){ .bg .sun{top:6px;right:auto;left:62%;width:64px} }
+@media (prefers-color-scheme:dark){ :root:not([data-theme="light"]) .bg .sun{display:none} }
+:root[data-theme="dark"] .bg .sun{display:none}
+
+/* ---------- Settings and Back: friendly rectangle buttons (replace the round corner) ---------- */
+.corner{left:calc(14px + env(safe-area-inset-left,0px));top:calc(14px + env(safe-area-inset-top,0px));width:auto;height:62px;padding:0 18px 0 10px;
+  border-radius:20px;background:var(--card);border:4px solid #7CC8F2;box-shadow:0 5px 0 rgba(0,0,0,.08),0 8px 18px var(--shadow);
+  display:flex;align-items:center;gap:8px;font-weight:800;font-size:22px;color:var(--ink);line-height:1}
+.corner.isBack{border-color:#8BD88B}
+.corner::after{display:none}
+.corner .ci{display:block;width:38px;height:38px;flex:none}
+.corner .ci svg{position:static;width:100%;height:100%;display:block}
+.corner .ct{padding-top:2px}
+.corner:active{transform:translateY(3px);box-shadow:0 2px 0 rgba(0,0,0,.08)}
+@media (max-width:600px){
+  .corner{height:52px;padding:0 12px 0 7px;font-size:18px;gap:5px;border-width:3px;border-radius:16px;left:calc(10px + env(safe-area-inset-left,0px))}
+  .corner .ci{width:30px;height:30px}
+  .corner.isSettings .ct{display:none}
+  .corner.isSettings{padding:0 9px}
+  .top{padding-left:118px;padding-right:80px}
+  .calmName{left:118px;right:76px}
+}
+@media (max-height:520px){ .corner{height:50px;font-size:18px;top:calc(10px + env(safe-area-inset-top,0px))} .corner .ci{width:30px;height:30px} }
+/* ---------- star burst transition ---------- */
+.iris .ring{border-radius:0;clip-path:var(--star)}
+.sparks{position:fixed;inset:0;z-index:60;pointer-events:none}
+.sparks i{position:absolute;clip-path:var(--star);will-change:transform}
+.calmName{left:180px;right:180px}
+@media (max-width:600px){ .calmName{left:118px;right:76px} }
+@media (max-height:520px){ .calmName{left:160px;right:160px} }
+@media (max-width:600px){ .title{white-space:normal;text-overflow:clip;font-size:clamp(16px,4.6vw,21px);line-height:1.05;padding:.32em .8em .24em;border-radius:22px} }
+
 @media (prefers-reduced-motion:reduce){
   *,*::before,*::after{animation-duration:.01ms!important;animation-iteration-count:1!important;transition-duration:.01ms!important}
   .bg .critter{animation:none!important}
@@ -596,6 +641,12 @@ function toast(msg){const t=h('div',{class:'toast',role:'status'},msg);document.
     for(let k=0;k<=6;k++){const u=k/6;pts.push([(1-u)*(1-u)*p1[0]+2*(1-u)*u*P[0]+u*u*p2[0],(1-u)*(1-u)*p1[1]+2*(1-u)*u*P[1]+u*u*p2[1]])}
   }
   document.documentElement.style.setProperty('--hex','polygon('+pts.map(p=>p[0].toFixed(2)+'% '+p[1].toFixed(2)+'%').join(',')+')');
+  // rounded star: 5 outer tips, 5 inner corners, every corner softened with a curve
+  const S=[], sp=[]; for(let i=0;i<10;i++){ const a=(-90+i*36)*Math.PI/180, r=i%2?25.5:50; S.push([50+r*Math.cos(a),53+r*Math.sin(a)]) }
+  for(let i=0;i<10;i++){ const P=S[i],A=S[(i+9)%10],B=S[(i+1)%10], tt=i%2?.12:.2;
+    const p1=[P[0]+(A[0]-P[0])*tt,P[1]+(A[1]-P[1])*tt], p2=[P[0]+(B[0]-P[0])*tt,P[1]+(B[1]-P[1])*tt];
+    for(let k=0;k<=6;k++){const u=k/6;sp.push([(1-u)*(1-u)*p1[0]+2*(1-u)*u*P[0]+u*u*p2[0],(1-u)*(1-u)*p1[1]+2*(1-u)*u*P[1]+u*u*p2[1]])} }
+  document.documentElement.style.setProperty('--star','polygon('+sp.map(p=>p[0].toFixed(2)+'% '+p[1].toFixed(2)+'%').join(',')+')');
 })();
 
 /* ================= icons + tile art (original illustrations) ================= */
@@ -658,7 +709,8 @@ function bgScene(){
   const turtle=`<svg width="78" height="46" viewBox="0 0 78 46"><g class="step"><ellipse cx="18" cy="38" rx="7" ry="5" fill="#A8DBA0" stroke="#3E6B45" stroke-width="2"/><ellipse cx="52" cy="38" rx="7" ry="5" fill="#A8DBA0" stroke="#3E6B45" stroke-width="2"/></g><circle cx="66" cy="26" r="9" fill="#A8DBA0" stroke="#3E6B45" stroke-width="2"/><circle cx="69" cy="24" r="1.6" fill="#26394A"/><path d="M8 34a28 26 0 0 1 56 0z" fill="#6FC08A" stroke="#3E6B45" stroke-width="2.4"/><path d="M22 20l6 8-6 6M42 16l-4 10 8 8" fill="none" stroke="#3E6B45" stroke-width="2" opacity=".6"/></svg>`;
   const bunny=`<svg width="58" height="60" viewBox="0 0 58 60"><g class="hop"><ellipse cx="38" cy="10" rx="4.5" ry="12" fill="#F7F4F2" stroke="#8E8580" stroke-width="2" transform="rotate(12 38 10)"/><ellipse cx="30" cy="10" rx="4.5" ry="12" fill="#F7F4F2" stroke="#8E8580" stroke-width="2" transform="rotate(-6 30 10)"/><ellipse cx="24" cy="42" rx="18" ry="13" fill="#F7F4F2" stroke="#8E8580" stroke-width="2"/><circle cx="38" cy="28" r="10" fill="#F7F4F2" stroke="#8E8580" stroke-width="2"/><circle cx="41" cy="26" r="1.6" fill="#26394A"/><circle cx="47" cy="30" r="1.8" fill="#F7849A"/><circle cx="7" cy="40" r="5" fill="#fff" stroke="#8E8580" stroke-width="2"/></g></svg>`;
   const duck=`<svg width="54" height="46" viewBox="0 0 54 46"><g class="step" style="transform-origin:27px 40px"><ellipse cx="24" cy="30" rx="18" ry="12" fill="#FFE27A" stroke="#A78A1E" stroke-width="2"/><circle cx="40" cy="16" r="9" fill="#FFE27A" stroke="#A78A1E" stroke-width="2"/><circle cx="42" cy="14" r="1.6" fill="#26394A"/><path d="M48 16l6 2-6 3z" fill="#FFA24D"/><path d="M14 26q8-6 16 2" fill="none" stroke="#A78A1E" stroke-width="2"/></g></svg>`;
-  return h('div',{class:'bg','aria-hidden':'true',html:hills+
+  const sun=`<svg viewBox="0 0 200 200"><g class="rays">${Array.from({length:12},(_,i)=>`<rect x="94" y="6" width="12" height="34" rx="6" fill="#FFC93C" transform="rotate(${i*30} 100 100)"/>`).join('')}</g><circle cx="100" cy="100" r="52" fill="#FFD84D" stroke="#F4A91F" stroke-width="5"/><circle cx="82" cy="94" r="5.5" fill="#7A4A12"/><circle cx="118" cy="94" r="5.5" fill="#7A4A12"/><path d="M80 112q20 18 40 0" fill="none" stroke="#7A4A12" stroke-width="5" stroke-linecap="round"/><circle cx="72" cy="110" r="7" fill="#FF9E7A" opacity=".6"/><circle cx="128" cy="110" r="7" fill="#FF9E7A" opacity=".6"/></svg>`;
+  return h('div',{class:'bg','aria-hidden':'true',html:`<div class="sun">${sun}</div>`+hills+
     `<div class="critter cloud">${cloud}</div><div class="critter cloud c2">${cloud}</div><div class="critter bird">${bird}</div><div class="critter fly">${fly}</div><div class="critter duck">${duck}</div><div class="critter turtle">${turtle}</div><div class="critter bunny">${bunny}</div>`});
 }
 function makeView(cls){ const v=h('div',{class:'view'+(cls?' '+cls:'')}); v.append(bgScene()); return v }
@@ -1017,7 +1069,9 @@ const RING=['#FF8C87','#FFAE80','#FFD97B','#FFF47E','#A6E37B','#6EDFD7','#7FCBFA
 function runCleanup(){ if(cleanup){ try{ cleanup() }catch(e){} cleanup=null } }
 function afterShow(view){ if(voiceNotePending&&view.classList.contains('home')) setTimeout(showVoiceNote,500) }
 function show(view){ runCleanup(); stage.innerHTML=''; stage.append(view); hydrate(view); view.classList.contains('home')||view.classList.contains('levels')?Music.start():Music.stop(); afterShow(view) }
-// Full iris for home ↔ feature; a quicker iris (opts.quick) between levels so play never drags
+// Star burst between screens: the old screen shrinks into a spinning star, coloured stars burst out, and the new screen grows out of a star.
+const BURST=['#FF5C8A','#FFB020','#FFE14D','#6BD66B','#38D1C4','#4DA8FF','#9B7BFF','#FF7AD9','#FF7A45'];
+function starPoly(cx,cy,R,rot){ const p=[]; for(let i=0;i<10;i++){ const a=(rot-90+i*36)*Math.PI/180, r=i%2?R*.5:R; p.push((cx+r*Math.cos(a)).toFixed(1)+'px '+(cy+r*Math.sin(a)).toFixed(1)+'px') } return 'polygon('+p.join(',')+')' }
 async function go(build,fromEl,opts={}){
   if(busy) return; busy=true; stage.style.pointerEvents='none';
   Voice.stop(); runCleanup(); hideVoiceNote();
@@ -1030,30 +1084,37 @@ async function go(build,fromEl,opts={}){
       view.style.opacity=0; stage.append(view); hydrate(view); isMenu?Music.start():Music.stop();
       await view.animate([{opacity:0},{opacity:1}],{duration:220,fill:'forwards'}).finished.catch(()=>{});
       view.style.opacity=''; [...stage.children].forEach(c=>c!==view&&c.remove()); return }
-    const T=opts.quick?{close:360,glide:0,pause:40,open:360}:{close:700,glide:340,pause:140,open:680};
+    const T=opts.quick?{close:380,pause:60,open:420}:{close:640,pause:160,open:700};
     SFX.whoosh(); isMenu?Music.start():Music.stop(.9);
     const W=innerWidth,H=innerHeight,cx=W/2,cy=H/2;
     let px=cx,py=cy; if(fromEl&&fromEl.isConnected){ const r=fromEl.getBoundingClientRect(); px=r.left+r.width/2; py=r.top+r.height/2 }
     const far=(x,y)=>Math.max(Math.hypot(x,y),Math.hypot(W-x,y),Math.hypot(x,H-y),Math.hypot(W-x,H-y));
-    const R=Math.max(far(px,py),far(cx,cy))*1.05, step=R/(RING.length-.6);
+    // behind the screens: big stars in party colours, spinning
     iris=h('div',{class:'iris'}); const wrap=h('div',{class:'ringWrap'}); iris.append(wrap);
-    for(let i=RING.length-1;i>=0;i--){ const r=(i+1)*step; wrap.append(h('div',{class:'ring',style:`width:${2*r}px;height:${2*r}px;left:${-r}px;top:${-r}px;background:${RING[i]}`})) }
+    const R=far(px,py)*2.3, n=BURST.length;
+    for(let i=0;i<n;i++){ const r=R*(1-i/n); wrap.append(h('div',{class:'ring',style:`width:${2*r}px;height:${2*r}px;left:${-r}px;top:${-r}px;background:${BURST[i]};transform:rotate(${i*14}deg)`})) }
     wrap.style.transform=`translate(${px}px,${py}px)`;
     document.body.append(iris);
+    wrap.animate([{transform:`translate(${px}px,${py}px) rotate(0deg) scale(1.15)`},{transform:`translate(${px}px,${py}px) rotate(40deg) scale(1)`}],{duration:T.close+T.pause+T.open,easing:'ease-out',fill:'forwards'});
+    // little stars burst out of the tap point
+    const sparks=h('div',{class:'sparks'}); document.body.append(sparks); setTimeout(()=>sparks.remove(),2600); const many=opts.quick?10:18;
+    for(let k=0;k<many;k++){ const a=Math.random()*Math.PI*2, d=(.25+Math.random()*.55)*Math.min(W,H), s=16+Math.random()*30;
+      const st=h('i',{style:`left:${px-s/2}px;top:${py-s/2}px;width:${s}px;height:${s}px;background:${BURST[k%n]}`}); sparks.append(st);
+      st.animate([{transform:'translate(0,0) scale(.2) rotate(0deg)',opacity:1},{transform:`translate(${Math.cos(a)*d}px,${Math.sin(a)*d}px) scale(1) rotate(${200+Math.random()*260}deg)`,opacity:1,offset:.7},{transform:`translate(${Math.cos(a)*d*1.15}px,${Math.sin(a)*d*1.15}px) scale(.6) rotate(420deg)`,opacity:0}],{duration:T.close+T.pause+T.open*.6,easing:'cubic-bezier(.2,.8,.3,1)',fill:'forwards'}) }
     old.style.willChange='clip-path';
-    const r0=far(px,py)*1.02;
-    wrap.animate([{transform:`translate(${px}px,${py}px) scale(1.18)`},{transform:`translate(${px}px,${py}px) scale(1)`}],{duration:T.close,easing:'ease-out'});
-    await old.animate([{clipPath:`circle(${r0}px at ${px}px ${py}px)`},{clipPath:`circle(0px at ${px}px ${py}px)`}],{duration:T.close,easing:'cubic-bezier(.55,0,.75,.35)',fill:'forwards'}).finished.catch(()=>{});
+    const R0=far(px,py)*2.15;
+    await old.animate([{clipPath:starPoly(px,py,R0,0)},{clipPath:starPoly(px,py,0,140)}],{duration:T.close,easing:'cubic-bezier(.55,0,.75,.35)',fill:'forwards'}).finished.catch(()=>{});
     [...stage.children].forEach(c=>c.remove());
-    const ox=T.glide?cx:px, oy=T.glide?cy:py;
-    if(T.glide&&Math.hypot(px-cx,py-cy)>4){ await wrap.animate([{transform:`translate(${px}px,${py}px)`},{transform:`translate(${cx}px,${cy}px)`}],{duration:T.glide,easing:'cubic-bezier(.4,0,.2,1)',fill:'forwards'}).finished.catch(()=>{}) }
     await wait(T.pause);
-    const R2=far(ox,oy)*1.02; view.style.willChange='clip-path'; stage.append(view); hydrate(view);
-    const a=view.animate([{clipPath:`circle(0px at ${ox}px ${oy}px)`},{clipPath:`circle(${R2}px at ${ox}px ${oy}px)`}],{duration:T.open,easing:'cubic-bezier(.3,0,.2,1)',fill:'forwards'});
+    const ox=cx, oy=cy, R2=far(ox,oy)*2.15; view.style.willChange='clip-path'; stage.append(view); hydrate(view);
+    const a=view.animate([{clipPath:starPoly(ox,oy,0,-140)},{clipPath:starPoly(ox,oy,R2,0)}],{duration:T.open,easing:'cubic-bezier(.3,0,.2,1)',fill:'forwards'});
     await a.finished.catch(()=>{}); a.cancel(); view.style.willChange='';
   } finally { if(iris) iris.remove(); if(!view.isConnected){ stage.innerHTML=''; stage.append(view); hydrate(view) } busy=false; stage.style.pointerEvents=''; afterShow(view) }
 }
-function cornerBtn(kind,onClick,label){ return h('button',{class:'corner','aria-label':label,onclick:()=>{ SFX.pop(); onClick() },html:ICON[kind]}) }
+const SETTINGS_ICON='<svg viewBox="0 0 40 40" aria-hidden="true"><rect x="4" y="6" width="32" height="28" rx="7" fill="#E9F5FF" stroke="#2F7FB8" stroke-width="3"/><path d="M11 15h18M11 25h18" stroke="#2F7FB8" stroke-width="3" stroke-linecap="round"/><circle cx="16" cy="15" r="3.6" fill="#FFB020" stroke="#2F7FB8" stroke-width="2.4"/><circle cx="25" cy="25" r="3.6" fill="#FF5C8A" stroke="#2F7FB8" stroke-width="2.4"/></svg>';
+const BACK_ICON='<svg viewBox="0 0 40 40" aria-hidden="true"><path d="M19 8 6 20l13 12v-7h15V15H19z" fill="#5CC85C" stroke="#2E7D32" stroke-width="2.6" stroke-linejoin="round"/></svg>';
+function cornerBtn(kind,onClick,label){ const back=kind==='back';
+  return h('button',{class:'corner '+(back?'isBack':'isSettings'),'aria-label':label,onclick:()=>{ SFX.pop(); onClick() }},h('span',{class:'ci',html:back?BACK_ICON:SETTINGS_ICON}),h('span',{class:'ct'},back?'Back':'Settings')) }
 function calmFab(){ return h('button',{class:'calmFab','aria-label':'Calm corner',html:ICON.calm,onclick:e=>{ SFX.pop(); Voice.say('Calm corner'); go(()=>viewCalm(0,true),e.currentTarget) }}) }
 function header(v,title,{calm=true,back,quick,badge}={}){
   v.append(cornerBtn('back',back||(()=>go(viewHome)),'Go back'));
@@ -1400,6 +1461,12 @@ function withName(text){ if(!cfg.childName) return text; if(typedNameOk()) retur
 function loadPill(b){ if(!b||!b.pack||!Clips.enabled()||Clips.status(b.pack)==='ready') return; let pill=$('.loadPill'); if(!pill){ pill=h('div',{class:'loadPill',role:'status'}); document.body.append(pill) }
   const draw=(id,pr)=>{ if(id!==b.pack) return; if(pr>=1||pr<0){ pill.textContent=pr<0?`${b.emoji} ${b.name} will use the tablet voice for now`:`${b.emoji} ${b.name} is ready!`; setTimeout(()=>pill.remove(),pr<0?3500:1200); Clips.onProgress=null; return } pill.textContent=`${b.emoji} ${b.name} is getting ready… ${Math.round(pr*100)}%` };
   Clips.onProgress=draw; draw(b.pack,Clips.pack(b.pack)?Clips.pack(b.pack).progress||0:0); Clips.ready(b.pack).then(()=>{ const o=otherBuddy(b); if(o&&o.pack) Clips.ready(o.pack) }) }
+// fit a category picture inside a star: zoom out so the picture sits in the star's body, and stretch its background to fill the points
+function starFit(art){ const sv=art.querySelector('svg'); if(!sv||!sv.viewBox||!sv.viewBox.baseVal) return; const vb=sv.viewBox.baseVal; if(!vb.width) return;
+  const x0=vb.x,y0=vb.y,w=vb.width,hh=vb.height, nx=x0-w*.24, ny=y0-hh*.2, nw=w*1.48, nh=hh*1.36;
+  sv.setAttribute('viewBox',`${nx} ${ny} ${nw} ${nh}`);
+  const bgRect=[...sv.querySelectorAll('rect')].find(r=>+r.getAttribute('width')>=w*.95&&+r.getAttribute('height')>=hh*.95);
+  if(bgRect){ bgRect.setAttribute('x',nx); bgRect.setAttribute('y',ny); bgRect.setAttribute('width',nw); bgRect.setAttribute('height',nh) } }
 function viewHome(){
   const v=makeView('home');
   v.append(cornerBtn('gear',openPin,'Grown-up corner'));
@@ -1407,14 +1474,16 @@ function viewHome(){
   v.append(h('div',{class:'topbar'},h('button',{class:'hello',onclick:()=>{ SFX.pop(); Voice.say(withName('Hi there! What do you want to play?')) }},'👋 '+greet)));
   const scroll=h('div',{class:'hiveScroll'}), hive=h('div',{class:'hive'}); scroll.append(hive); v.append(scroll);
   FEATS.forEach(F=>{
-    const b=h('button',{class:'tile','aria-label':F.title},h('div',{class:'rim'}),h('div',{class:'art',html:ART[F.art]}),h('span',{class:'tlabel'},F.title));
+    const art=h('div',{class:'art',html:ART[F.art]}); starFit(art);
+    const b=h('button',{class:'tile','aria-label':F.title},h('div',{class:'rim'}),art,h('span',{class:'tlabel'},F.title));
     b.addEventListener('click',()=>{ if(busy) return; SFX.pop(); homeScroll=scroll.scrollLeft; Voice.say(F.title); go(F.id==='mean'?viewMean:()=>viewLevels(F.id),b) });
     hive.append(b) });
-  const lay=()=>{ const H=innerHeight-150; let th=Math.min(H/1.8, innerWidth*.56, 420); th=Math.max(th,150);
-    const tw=th*.866, g=th*.05, col=tw+g;
+  // stars in two zig-zag rows: each star tucks between the two above it
+  const lay=()=>{ const H=innerHeight-(innerHeight<520?112:150); let s=Math.min(H/1.72, innerWidth*.6, 400); s=Math.max(s,150);
+    const col=s*.98, down=s*.7;
     [...hive.children].forEach((el,i)=>{ const top=i%2===0, c=Math.floor(i/2);
-      Object.assign(el.style,{width:tw+'px',height:th+'px',left:(c*col+(top?col/2:0))+'px',top:(top?0:th*.75+g*.87)+'px'}) });
-    hive.style.width=(Math.ceil(FEATS.length/2)*col+col/2+60)+'px'; hive.style.height=(th*1.75+g)+'px' };
+      Object.assign(el.style,{width:s+'px',height:s+'px',left:(c*col+(top?col/2:0))+'px',top:(top?0:down)+'px'}) });
+    hive.style.width=(Math.ceil(FEATS.length/2)*col+col/2+60)+'px'; hive.style.height=(s+down)+'px' };
   lay(); addEventListener('resize',lay); cleanup=()=>removeEventListener('resize',lay);
   scroll.addEventListener('wheel',e=>{ if(Math.abs(e.deltaY)>Math.abs(e.deltaX)){ scroll.scrollLeft+=e.deltaY; e.preventDefault() } },{passive:false});
   requestAnimationFrame(()=>{ scroll.scrollLeft=homeScroll });
