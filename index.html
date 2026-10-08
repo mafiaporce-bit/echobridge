@@ -867,17 +867,13 @@ const Live={
   }
 };
 
-/* ================= voices: 5 buddies built on the device's speech engine ================= */
-// Gentle pitch/speed values: anything far from 1.0 makes a speech engine sound robotic.
-// pack = the Kokoro voice pack (natural recorded speech); pitch/rate only shape the tablet-voice fallback
+/* ================= voices: 2 cheerful buddies (a girl and a boy) ================= */
+// pack = the Kokoro voice file (natural recorded speech with cheerful delivery); pitch/rate only shape the tablet-voice fallback
 const DEFAULT_VOICES=[
-  {id:'lily',name:'Lily',kind:'girl',emoji:'🐰',pack:'lily',kokoro:'Heart',pitch:1.15,rate:.95,voiceURI:''},
-  {id:'mia',name:'Mia',kind:'girl',emoji:'🦋',pack:'mia',kokoro:'Emma (British)',pitch:1.05,rate:.92,voiceURI:''},
-  {id:'rosie',name:'Rosie',kind:'girl',emoji:'🌸',pack:'rosie',kokoro:'Bella',pitch:1.25,rate:.98,voiceURI:''},
-  {id:'leo',name:'Leo',kind:'boy',emoji:'🦁',pack:'leo',kokoro:'Puck',pitch:.95,rate:.95,voiceURI:''},
-  {id:'max',name:'Max',kind:'boy',emoji:'🐻',pack:'max',kokoro:'Michael',pitch:.85,rate:.9,voiceURI:''}
+  {id:'lily',name:'Lily',kind:'girl',emoji:'🐰',pack:'girl',kokoro:'Girl voice',pitch:1.15,rate:.95,voiceURI:''},
+  {id:'leo',name:'Leo',kind:'boy',emoji:'🦁',pack:'boy',kokoro:'Boy voice',pitch:.95,rate:.95,voiceURI:''}
 ];
-const PACKS={lily:'Heart (girl)',mia:'Emma (girl, British)',rosie:'Bella (girl)',leo:'Puck (boy)',max:'Michael (boy)'};
+const PACKS={girl:'Girl voice',boy:'Boy voice'};
 function otherBuddy(b){ const vs=cfg.voices.filter(v=>v.pack&&v.id!==b.id); return vs.find(v=>v.kind!==b.kind)||vs[0]||b }
 const MALE_RX=/\bmale\b|\bman\b|boy|daniel|david|alex\b|fred|george|james|mark\b|rishi|aaron|arthur|guy|thomas|oliver|\btom\b|eddy|reed|rocko|-iol|-iom|-tpd|-gbd|-rjs|-aub|-ene\b|#male/i;
 const FEMALE_RX=/female|woman|girl|samantha|karen|victoria|zira|susan|serena|moira|tessa|fiona|allison|\bava\b|\bzoe\b|nicky|kate|hazel|libby|sonia|aria|jenny|-sfg|-iob|-iog|-tpc|-tpf|-gba|-gbc|-gbg|-aua|#female|google us english|google uk english female/i;
@@ -1070,7 +1066,9 @@ function runCleanup(){ if(cleanup){ try{ cleanup() }catch(e){} cleanup=null } }
 function afterShow(view){ if(voiceNotePending&&view.classList.contains('home')) setTimeout(showVoiceNote,500) }
 function show(view){ runCleanup(); stage.innerHTML=''; stage.append(view); hydrate(view); view.classList.contains('home')||view.classList.contains('levels')?Music.start():Music.stop(); afterShow(view) }
 // Star burst between screens: the old screen shrinks into a spinning star, coloured stars burst out, and the new screen grows out of a star.
-const BURST=['#FF5C8A','#FFB020','#FFE14D','#6BD66B','#38D1C4','#4DA8FF','#9B7BFF','#FF7AD9','#FF7A45'];
+// soft, light party colours (pastel pink, peach, lemon, mint, aqua, sky, lilac, candy, apricot)
+const BURST=['#FFC9DE','#FFDDB8','#FFF3A8','#CDF5C4','#BFF0EA','#C7E3FF','#DCD2FF','#FFD1F1','#FFE0CC'];
+const SPARK=['#FF8FB8','#FFB866','#FFE066','#8EE68E','#6FE0D6','#7CC2FF','#B9A3FF','#FF9EE6','#FFA580'];
 function starPoly(cx,cy,R,rot){ const p=[]; for(let i=0;i<10;i++){ const a=(rot-90+i*36)*Math.PI/180, r=i%2?R*.5:R; p.push((cx+r*Math.cos(a)).toFixed(1)+'px '+(cy+r*Math.sin(a)).toFixed(1)+'px') } return 'polygon('+p.join(',')+')' }
 async function go(build,fromEl,opts={}){
   if(busy) return; busy=true; stage.style.pointerEvents='none';
@@ -1084,22 +1082,22 @@ async function go(build,fromEl,opts={}){
       view.style.opacity=0; stage.append(view); hydrate(view); isMenu?Music.start():Music.stop();
       await view.animate([{opacity:0},{opacity:1}],{duration:220,fill:'forwards'}).finished.catch(()=>{});
       view.style.opacity=''; [...stage.children].forEach(c=>c!==view&&c.remove()); return }
-    const T=opts.quick?{close:380,pause:60,open:420}:{close:640,pause:160,open:700};
+    const T=opts.quick?{close:760,pause:120,open:840}:{close:1280,pause:320,open:1400};   // twice as long as before
     SFX.whoosh(); isMenu?Music.start():Music.stop(.9);
     const W=innerWidth,H=innerHeight,cx=W/2,cy=H/2;
     let px=cx,py=cy; if(fromEl&&fromEl.isConnected){ const r=fromEl.getBoundingClientRect(); px=r.left+r.width/2; py=r.top+r.height/2 }
     const far=(x,y)=>Math.max(Math.hypot(x,y),Math.hypot(W-x,y),Math.hypot(x,H-y),Math.hypot(W-x,H-y));
     // behind the screens: big stars in party colours, spinning
     iris=h('div',{class:'iris'}); const wrap=h('div',{class:'ringWrap'}); iris.append(wrap);
-    const R=far(px,py)*2.3, n=BURST.length;
-    for(let i=0;i<n;i++){ const r=R*(1-i/n); wrap.append(h('div',{class:'ring',style:`width:${2*r}px;height:${2*r}px;left:${-r}px;top:${-r}px;background:${BURST[i]};transform:rotate(${i*14}deg)`})) }
+    const R=far(px,py)*2.6, n=BURST.length;
+    for(let i=0;i<n;i++){ const r=R*(1-i/(n+1.5)); wrap.append(h('div',{class:'ring',style:`width:${2*r}px;height:${2*r}px;left:${-r}px;top:${-r}px;background:${BURST[i]};transform:rotate(${i*14}deg)`})) }
     wrap.style.transform=`translate(${px}px,${py}px)`;
     document.body.append(iris);
-    wrap.animate([{transform:`translate(${px}px,${py}px) rotate(0deg) scale(1.15)`},{transform:`translate(${px}px,${py}px) rotate(40deg) scale(1)`}],{duration:T.close+T.pause+T.open,easing:'ease-out',fill:'forwards'});
+    wrap.animate([{transform:`translate(${px}px,${py}px) rotate(0deg) scale(1.15)`},{transform:`translate(${px}px,${py}px) rotate(70deg) scale(1)`}],{duration:T.close+T.pause+T.open,easing:'ease-out',fill:'forwards'});
     // little stars burst out of the tap point
-    const sparks=h('div',{class:'sparks'}); document.body.append(sparks); setTimeout(()=>sparks.remove(),2600); const many=opts.quick?10:18;
-    for(let k=0;k<many;k++){ const a=Math.random()*Math.PI*2, d=(.25+Math.random()*.55)*Math.min(W,H), s=16+Math.random()*30;
-      const st=h('i',{style:`left:${px-s/2}px;top:${py-s/2}px;width:${s}px;height:${s}px;background:${BURST[k%n]}`}); sparks.append(st);
+    const sparks=h('div',{class:'sparks'}); document.body.append(sparks); setTimeout(()=>sparks.remove(),T.close+T.pause+T.open+400); const many=opts.quick?12:22;
+    for(let k=0;k<many;k++){ const a=Math.random()*Math.PI*2, d=(.3+Math.random()*.6)*Math.min(W,H), s=50+Math.random()*70;   // big stars
+      const st=h('i',{style:`left:${px-s/2}px;top:${py-s/2}px;width:${s}px;height:${s}px;background:${SPARK[k%n]}`}); sparks.append(st);
       st.animate([{transform:'translate(0,0) scale(.2) rotate(0deg)',opacity:1},{transform:`translate(${Math.cos(a)*d}px,${Math.sin(a)*d}px) scale(1) rotate(${200+Math.random()*260}deg)`,opacity:1,offset:.7},{transform:`translate(${Math.cos(a)*d*1.15}px,${Math.sin(a)*d*1.15}px) scale(.6) rotate(420deg)`,opacity:0}],{duration:T.close+T.pause+T.open*.6,easing:'cubic-bezier(.2,.8,.3,1)',fill:'forwards'}) }
     old.style.willChange='clip-path';
     const R0=far(px,py)*2.15;
@@ -1397,7 +1395,7 @@ function iyQuestions(li){ const [ask,ans,items]=IY[li];
 "use strict";
 /* ================= config ================= */
 const V1_SAYS=['I want to eat apples','I want a drink of water','I want a snack','I am all done eating','I want to play with blocks','I want to go outside','I want to play with you','I want my toy','I feel sleepy','I want to lie down','I want quiet time','It is too loud','I need a hug','I need a break','I want my calm corner','I feel happy','I like this','Again, please','I love you','I want Mom','I want Dad','I want to take a bath'];
-function defaults(){ return {v:4,updatedAt:0,childName:'',pin:'1234',sfx:true,calmSound:true,calmVoice:true,music:true,musicVol:.5,speed:1,activeVoice:'lily',voices:clone(DEFAULT_VOICES),needs:NEEDS(),scripts:SCRIPTS(),scenarios:SCENARIOS(),progress:{}} }
+function defaults(){ return {v:5,updatedAt:0,childName:'',pin:'1234',sfx:true,calmSound:true,calmVoice:true,music:true,musicVol:.5,speed:1,activeVoice:'lily',voices:clone(DEFAULT_VOICES),needs:NEEDS(),scripts:SCRIPTS(),scenarios:SCENARIOS(),progress:{}} }
 function normalize(c){
   const d=defaults(); if(!c) return d; c=Object.assign({},d,c);
   if((c.v||1)<2){
@@ -1411,6 +1409,13 @@ function normalize(c){
     (c.voices||[]).forEach(v=>{ const d=DEFAULT_VOICES.find(x=>x.id===v.id); if(d){ v.pitch=d.pitch; v.rate=d.rate } else { v.pitch=clamp(+v.pitch||1,.7,1.4); v.rate=clamp(+v.rate||1,.7,1.25) } });
     if(c.music==null) c.music=true; if(c.musicVol==null) c.musicVol=.5; if(c.speed==null) c.speed=1; c.v=3 }
   if((c.v||1)<4){ (c.voices||[]).forEach(v=>{ const d=DEFAULT_VOICES.find(x=>x.id===v.id); if(d){ v.pack=d.pack; v.kokoro=d.kokoro } else if(!v.pack){ v.pack=v.kind==='boy'?'leo':'lily'; v.kokoro=PACKS[v.pack] } }); c.v=4 }
+  if((c.v||1)<5){   // two cheerful voices replace the five: Mia and Rosie join Lily (girl voice), Max joins Leo (boy voice)
+    const toPack=x=>({lily:'girl',mia:'girl',rosie:'girl',leo:'boy',max:'boy',girl:'girl',boy:'boy'})[x]||'girl';
+    const was=c.activeVoice; const custom=(c.voices||[]).filter(v=>!['lily','mia','rosie','leo','max'].includes(v.id));
+    custom.forEach(v=>{ v.pack=toPack(v.pack||(v.kind==='boy'?'boy':'girl')); v.kind=v.pack; v.kokoro=PACKS[v.pack] });
+    const keepNames={}; (c.voices||[]).forEach(v=>{ if(v.id==='lily'||v.id==='leo') keepNames[v.id]=v.name });
+    c.voices=clone(DEFAULT_VOICES).map(d=>Object.assign(d,keepNames[d.id]?{name:keepNames[d.id]}:{})).concat(custom);
+    c.activeVoice=['mia','rosie','lily'].includes(was)?'lily':['max','leo'].includes(was)?'leo':(c.voices.some(v=>v.id===was)?was:'lily'); c.v=5 }
   for(const k of ['needs','scripts','scenarios','voices']) if(!Array.isArray(c[k])||!c[k].length&&k==='voices') c[k]=d[k];
   if(!c.progress||typeof c.progress!=='object') c.progress={};
   return c }
@@ -1810,7 +1815,7 @@ function viewParent(){
   function voices(){
     Voice.load();
     const n=Voice.voices.length, best=Voice.best(), kok=Clips.enabled();
-    panel.append(h('h2',null,'Voice buddies'),h('p',{class:'muted'},'Every line in the games was recorded with Kokoro, a natural-sounding AI voice, so the buddies never sound robotic. Three girls and two boys. Anything you type yourself (new buttons, new stories, the name) is spoken by the tablet’s own voice, by a recording you make, or live by Kokoro if you turn that on below.'));
+    panel.append(h('h2',null,'Voice buddies'),h('p',{class:'muted'},'Every line in the games was recorded with Kokoro, a natural-sounding AI voice, so the buddies never sound robotic. One girl and one boy, with cheerful voices: they cheer when something goes right and speak softly when it is time to try again. Anything you type yourself (new buttons, new stories, the name) is spoken by the tablet’s own voice, by a recording you make, or live by Kokoro if you turn that on below.'));
     panel.append(toggleField('Use the natural Kokoro voices (recommended)',kok,x=>{ cfg.kokoro=x; Store.later(); drawPanel(); if(x) loadPill(activeBuddy()) }));
     const liveRow=h('p',{class:'muted',style:'margin:-4px 0 12px'});
     const drawLive=()=>{ const s=Live.state; liveRow.textContent=s==='ready'?'✅ Live voice is ready. Anything you type is spoken by the same Kokoro voice.':s==='loading'?'⏳ Getting the live voice (about 90 MB, once)…':s==='failed'?'⚠️ Live voice could not load (needs internet the first time). The tablet voice is used instead.':'Live voice not downloaded yet.' };
@@ -1825,7 +1830,7 @@ function viewParent(){
       const nm=h('input',{type:'text',value:b.name,'aria-label':'Buddy name'}); nm.addEventListener('input',()=>{ b.name=nm.value||b.name; Store.later() });
       card.append(h('div',{class:'vh'},h('span',{class:'ve'},b.emoji),nm));
       if(kok){
-        const st=Clips.status(b.pack); const pk=h('select',{'aria-label':'Kokoro voice'}); Object.entries(PACKS).forEach(([id,l])=>pk.append(h('option',{value:id},l))); pk.value=b.pack||'lily';
+        const st=Clips.status(b.pack); const pk=h('select',{'aria-label':'Kokoro voice'}); Object.entries(PACKS).forEach(([id,l])=>pk.append(h('option',{value:id},l))); pk.value=b.pack||'girl';
         pk.addEventListener('change',()=>{ b.pack=pk.value; b.kokoro=PACKS[b.pack]; b.kind=/boy/.test(PACKS[b.pack])?'boy':'girl'; Store.later(); loadPill(b); Voice.say(buddyHello(b),{buddy:b}) });
         card.append(h('label',{class:'sl'},h('span',null,'Kokoro voice'),pk),h('p',{class:'muted',style:'margin:6px 0 0'},st==='ready'?'✅ Ready on this tablet':st==='failed'?(Clips.problem(b.pack)==='damaged'?`⚠️ The voice file ${b.pack}.ebv is damaged. Upload a fresh copy next to the app.`:Clips.problem(b.pack)==='missing'?`⚠️ The voice file ${b.pack}.ebv was not found. Upload it next to the app.`:`⚠️ Could not download ${b.pack}.ebv. Check the internet and reload.`):st==='loading'?'⏳ Downloading…':'Downloads once, then works offline'));
       } else {
@@ -1841,8 +1846,8 @@ function viewParent(){
       if(!DEFAULT_VOICES.some(d=>d.id===b.id)) actions.append(h('button',{class:'btn warn',onclick:()=>{ cfg.voices=cfg.voices.filter(x=>x!==b); if(cfg.activeVoice===b.id) cfg.activeVoice=cfg.voices[0].id; Store.later(); drawPanel() }},'Remove'));
       card.append(actions); grid.append(card) });
     panel.append(grid,h('div',{class:'row',style:'margin-top:14px'},
-      h('button',{class:'btn',onclick:()=>{ const em=['🐣','🐼','🦄','🐬','🐯','🐨','🦊'][cfg.voices.length%7]; const pack=['lily','leo','rosie','max','mia'][cfg.voices.length%5]; cfg.voices.push({id:uid('v'),name:'Buddy '+(cfg.voices.length+1),kind:/boy/.test(PACKS[pack])?'boy':'girl',emoji:em,pack,kokoro:PACKS[pack],pitch:1.1,rate:.95,voiceURI:''}); Store.later(); drawPanel() }},'+ Add a buddy'),
-      h('button',{class:'btn',onclick:()=>{ const keep=cfg.voices.filter(x=>!DEFAULT_VOICES.some(d=>d.id===x.id)); cfg.voices=clone(DEFAULT_VOICES).concat(keep); Store.later(); drawPanel(); toast('Voices reset') }},'Reset the 5 buddies')));
+      h('button',{class:'btn',onclick:()=>{ const em=['🐣','🐼','🦄','🐬','🐯','🐨','🦊'][cfg.voices.length%7]; const pack=['girl','boy'][cfg.voices.length%2]; cfg.voices.push({id:uid('v'),name:'Buddy '+(cfg.voices.length+1),kind:/boy/.test(PACKS[pack])?'boy':'girl',emoji:em,pack,kokoro:PACKS[pack],pitch:1.1,rate:.95,voiceURI:''}); Store.later(); drawPanel() }},'+ Add a buddy'),
+      h('button',{class:'btn',onclick:()=>{ const keep=cfg.voices.filter(x=>!DEFAULT_VOICES.some(d=>d.id===x.id)); cfg.voices=clone(DEFAULT_VOICES).concat(keep); Store.later(); drawPanel(); toast('Voices reset') }},'Reset the 2 buddies')));
     panel.append(h('h3',null,'Tablet voice (for words you add)'),h('p',{class:'muted'},`${n?`This tablet has ${n} voice${n===1?'':'s'}; the app picks the most natural one${best?` (right now: ${best.name})`:''}.`:'No tablet voices were found.'} Turn Kokoro off above to choose and tune the tablet voice per buddy. `,h('button',{class:'btn',onclick:voiceHelp},'How to get better tablet voices')),
       Voice.fails>=2?h('div',{class:'status bad',style:'margin-top:8px'},'🔇 The tablet voice isn’t playing here, so words you add will be silent unless you record them.'):'') }
 
