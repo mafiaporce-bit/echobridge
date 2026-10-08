@@ -28,18 +28,6 @@
   padding-top:env(safe-area-inset-top,0px);
   padding-bottom:env(safe-area-inset-bottom,0px);
 }
-@media (prefers-color-scheme:dark){
-  :root:not([data-theme="light"]){
-    --sky:#16303D; --paper:#18343F; --meadow:#173A30; --hill1:#1C4535; --hill2:#1F4D3B; --hill3:#1B3C4B;
-    --ink:#E8F5F9; --ink2:#A7C4D0; --card:#1F4251; --soft:#1A3A47; --rim:#E6F3F7;
-    --blueSoft:#24536A; --greenSoft:#1F5842; --shadow:rgba(0,0,0,.35);
-  }
-}
-:root[data-theme="dark"]{
-  --sky:#16303D; --paper:#18343F; --meadow:#173A30; --hill1:#1C4535; --hill2:#1F4D3B; --hill3:#1B3C4B;
-  --ink:#E8F5F9; --ink2:#A7C4D0; --card:#1F4251; --soft:#1A3A47; --rim:#E6F3F7;
-  --blueSoft:#24536A; --greenSoft:#1F5842; --shadow:rgba(0,0,0,.35);
-}
 *,*::before,*::after{box-sizing:inherit}
 html{scroll-padding-top:env(safe-area-inset-top,0px);height:100%}
 html,body{margin:0;height:100%;overflow:hidden;background:var(--paper)}
@@ -557,7 +545,7 @@ input,textarea,select{font:inherit;color:var(--ink)}
 .tile .tlabel{bottom:13%}
 .tile{filter:drop-shadow(0 8px 10px rgba(40,110,160,.22))}
 /* ---------- bright daytime sky with a sun ---------- */
-:root:not([data-theme="dark"]) .view{background:linear-gradient(180deg,#8FD3FF 0%,#B9E4FF 30%,#E2F4FF 58%,#F4FBF7 78%,var(--meadow) 100%)}
+.view{background:linear-gradient(180deg,#8FD3FF 0%,#B9E4FF 30%,#E2F4FF 58%,#F4FBF7 78%,var(--meadow) 100%)}
 .bg .sun{position:absolute;top:calc(8px + 3vh);right:max(230px,22vw);width:clamp(84px,15vh,150px);aspect-ratio:1;z-index:0}
 .bg .sun svg{width:100%;height:100%;display:block;filter:drop-shadow(0 0 22px rgba(255,214,90,.75))}
 .bg .sun .rays{transform-origin:100px 100px;animation:sunspin 60s linear infinite}
@@ -565,8 +553,6 @@ input,textarea,select{font:inherit;color:var(--ink)}
 .view.quiet .bg .sun{opacity:.85}
 @media (max-width:600px){ .bg .sun{right:auto;left:42%;top:calc(96px + 2vh);width:78px} }
 @media (max-height:520px){ .bg .sun{top:6px;right:auto;left:62%;width:64px} }
-@media (prefers-color-scheme:dark){ :root:not([data-theme="light"]) .bg .sun{display:none} }
-:root[data-theme="dark"] .bg .sun{display:none}
 
 /* ---------- Settings and Back: friendly rectangle buttons (replace the round corner) ---------- */
 .corner{left:calc(14px + env(safe-area-inset-left,0px));top:calc(14px + env(safe-area-inset-top,0px));width:auto;height:62px;padding:0 18px 0 10px;
@@ -989,16 +975,26 @@ const Music={ctx:null,master:null,duckG:null,noise:null,timer:0,next:0,slot:0,ba
   // bass as quarter notes: root, fifth, root, fifth
   bassA:[48,55,48,55, 48,55,48,55, 53,60,53,60, 55,62,55,62, 48,55,48,55, 53,60,55,62, 48,55,48,55, 55,62,48,0],
   bassB:[48,55,48,55, 48,55,48,55, 55,62,55,62, 48,55,48,55, 48,55,48,55, 53,60,53,60, 55,62,55,62, 48,55,48,0],
+  // menu.mp3: a recorded tune that loops; the synth loop below is the fallback while it loads or if it is missing
+  file:null, fileState:'idle', src:null, mode:'',
   c(){ return SFX.raw() },
-  vol(){ return Math.max(.0001,(cfg.musicVol==null?.5:cfg.musicVol)*.45) },
+  vol(){ return Math.max(.0001,(cfg.musicVol==null?.5:cfg.musicVol)*(this.mode==='file'?.34:.45)) },
+  loadFile(){ if(this.fileState!=='idle') return; this.fileState='loading'; const c=this.c(); if(!c){ this.fileState='idle'; return }
+    (async()=>{ try{ let r=null; for(const bs of ['','voices/v1/']){ try{ const r0=await fetch(bs+'menu.mp3',{cache:'force-cache'}); if(r0.ok){ r=r0; break } }catch(e){} }
+        if(!r) throw new Error('no menu.mp3');
+        const bytes=await r.arrayBuffer(); this.file=await new Promise((res,rej)=>{ const p=c.decodeAudioData(bytes,res,rej); if(p&&p.then) p.then(res,rej) }); this.fileState='ready';
+        if(this.on&&this.mode==='synth'){ this.stop(.8); setTimeout(()=>{ if(this.want||cfg.music) this.start() },850) }   // swap the synth loop for the tune once it is ready
+      }catch(e){ console.warn('menu music file unavailable, using the built-in tune',e); this.fileState='failed' } })() },
   start(){ this.want=true; if(!Voice.unlocked||!cfg.music||this.on||document.hidden) return; const c=this.c(); if(!c) return;
     if(!this.master){ this.master=c.createGain(); this.duckG=c.createGain(); this.master.gain.value=.0001; this.duckG.gain.value=1; this.master.connect(this.duckG).connect(c.destination);
       const n=c.sampleRate*.08, b=c.createBuffer(1,n,c.sampleRate), d=b.getChannelData(0); for(let i=0;i<n;i++) d[i]=Math.random()*2-1; this.noise=b }
-    this.on=true; this.next=c.currentTime+.08; this.slot=0; this.bar=0;
-    const g=this.master.gain; g.cancelScheduledValues(c.currentTime); g.setValueAtTime(.0001,c.currentTime); g.exponentialRampToValueAtTime(this.vol(),c.currentTime+1.4);
-    clearInterval(this.timer); this.timer=setInterval(()=>this.tick(),40) },
+    this.on=true; this.loadFile();
+    if(this.file){ this.mode='file'; const s=c.createBufferSource(); s.buffer=this.file; s.loop=true; s.connect(this.master); s.start(); this.src=s }
+    else{ this.mode='synth'; this.next=c.currentTime+.08; this.slot=0; this.bar=0; clearInterval(this.timer); this.timer=setInterval(()=>this.tick(),40) }
+    const g=this.master.gain; g.cancelScheduledValues(c.currentTime); g.setValueAtTime(.0001,c.currentTime); g.exponentialRampToValueAtTime(this.vol(),c.currentTime+1.4) },
   stop(fade){ this.want=false; if(!this.on) return; this.on=false; clearInterval(this.timer); const c=this.c(), g=this.master.gain;
-    g.cancelScheduledValues(c.currentTime); g.setValueAtTime(Math.max(g.value,.0001),c.currentTime); g.exponentialRampToValueAtTime(.0001,c.currentTime+(fade||.45)) },
+    g.cancelScheduledValues(c.currentTime); g.setValueAtTime(Math.max(g.value,.0001),c.currentTime); g.exponentialRampToValueAtTime(.0001,c.currentTime+(fade||.45));
+    const s=this.src; this.src=null; if(s){ try{ s.stop(c.currentTime+(fade||.45)+.05) }catch(e){} } },
   pause(){ const w=this.want; this.stop(.2); this.want=w },
   setVol(){ if(!this.on) return; const c=this.c(), g=this.master.gain; g.cancelScheduledValues(c.currentTime); g.setValueAtTime(Math.max(g.value,.0001),c.currentTime); g.linearRampToValueAtTime(this.vol(),c.currentTime+.2) },
   duck(d){ if(!this.on||!this.duckG) return; const c=this.c(), g=this.duckG.gain; g.cancelScheduledValues(c.currentTime); g.setValueAtTime(g.value,c.currentTime); g.linearRampToValueAtTime(d?.3:1,c.currentTime+.25) },
