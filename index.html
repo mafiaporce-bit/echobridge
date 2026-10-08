@@ -379,6 +379,178 @@ input,textarea,select{font:inherit;color:var(--ink)}
   .topbar{padding:0 120px}
   .calmName{padding:0 110px;font-size:22px}
 }
+/* ---------- phones and narrow tablets in portrait: everything fits, nothing sits on top of anything ---------- */
+.lvBody{display:block}
+.lv .lvT{white-space:normal;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;max-width:84%;line-height:1.05;text-overflow:clip}
+.title{white-space:nowrap;max-width:100%;overflow:hidden;text-overflow:ellipsis}
+.calmName{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.mean{padding-bottom:var(--stripH,128px)}
+@media (max-width:600px){
+  .corner{width:92px;height:calc(92px + env(safe-area-inset-top,0px));border-bottom-right-radius:92px}
+  .corner::after{width:102px;height:calc(102px + env(safe-area-inset-top,0px));border-bottom-right-radius:102px}
+  .corner svg{left:12px;top:calc(10px + env(safe-area-inset-top,0px));width:52px;height:52px}
+  .calmFab{width:60px;height:60px;right:calc(12px + env(safe-area-inset-right,0px));top:calc(14px + env(safe-area-inset-top,0px))}
+  .calmFab svg{width:44px;height:44px}
+  .top{height:88px;padding:0 82px 0 98px}
+  .title{font-size:clamp(17px,4.8vw,24px);padding:.3em .7em .2em}
+  .title .tbadge{font-size:.7em}
+  .body{top:88px;padding-left:12px;padding-right:12px}
+  /* home */
+  .topbar{height:88px;padding:0 160px 0 98px;justify-content:flex-start}
+  .hello{font-size:18px;padding:.45em .8em .35em}
+  .homeTools{gap:8px;right:calc(10px + env(safe-area-inset-right,0px))}
+  .buddy{min-height:54px;padding:6px 10px 4px}
+  .buddy span{font-size:30px}
+  .musicBtn{width:54px;height:54px;font-size:26px}
+  .home .hiveScroll{top:88px}
+  .brand{display:none}
+  .loadPill{font-size:15px;padding:7px 14px 5px}
+  /* what I mean */
+  .mean{grid-template-columns:84px 1fr;gap:10px}
+  .rail{gap:7px;padding:2px 2px 8px}
+  .cat{font-size:12px;padding:4px 2px 3px;border-radius:18px;border-width:3px}
+  .cat .e{font-size:26px}
+  .grid{grid-template-columns:repeat(auto-fill,minmax(128px,1fr));gap:10px;padding:2px 2px 10px}
+  .need{min-height:150px;padding:10px 8px 12px;border-radius:22px;gap:4px}
+  .need .pic{width:70px;height:70px;font-size:40px}
+  .need .words{font-size:16px}
+  .need .quote{font-size:14px}
+  .strip{height:auto;min-height:74px;left:10px;right:10px;bottom:calc(10px + env(safe-area-inset-bottom,0px));border-radius:24px;gap:12px;padding:8px 12px}
+  .strip .sp{width:54px;height:54px;font-size:34px}
+  .strip .st{font-size:18px;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+  .strip .st small{font-size:.75em}
+  .strip .speakBtn{width:46px;height:46px}
+  /* quizzes */
+  .scene{border-radius:26px;border-width:4px}
+  .scene .say{font-size:17px;padding:8px 12px 6px}
+  .sceneText{font-size:19px;margin-top:10px}
+  .q{font-size:21px;margin-bottom:12px}
+  .opt{min-height:80px;padding:10px 12px;border-radius:22px;gap:12px}
+  .opt .oe{width:60px;height:60px;font-size:36px}
+  .opt .ot{font-size:19px}
+  .opt .speakBtn{width:42px;height:42px}
+  .opts.two .opt{min-height:140px;padding:12px}
+  .opts.two .opt .oe{width:80px;height:80px;font-size:50px}
+  .opts.faces .opt .oe{width:70px;height:70px;font-size:50px}
+  .why{font-size:17px;padding:12px 14px;border-radius:20px}
+  .why .big{font-size:34px}
+  .bigBtn{font-size:21px;padding:12px 22px 10px}
+  /* matcher, order, listen */
+  .colHead{font-size:17px}
+  .board{gap:10px 22px}
+  .chip{min-height:78px;padding:8px 12px;gap:10px;border-radius:22px;border-width:4px}
+  .chip .ce{font-size:34px}
+  .chip .ct{font-size:16px}
+  .chip .badge{width:30px;height:30px;font-size:17px;right:-8px;top:-8px}
+  .slot,.card{width:clamp(96px,28vw,150px)}
+  .card{min-height:120px;border-radius:22px;padding:8px}
+  .card .ce,.slot .se{font-size:44px}
+  .card .ct,.slot .stx{font-size:15px}
+  .slot .sl{font-size:17px}
+  .slots,.pile{gap:10px}
+  .listenQ{font-size:21px;gap:10px;margin-bottom:14px}
+  .things{gap:12px}
+  .done .stars{font-size:60px}
+  .done h2{font-size:34px}
+  .empty{font-size:20px}
+  .empty .e{font-size:64px}
+  /* calm */
+  .calmName{padding:0 80px 0 100px;font-size:19px;top:calc(30px + env(safe-area-inset-top,0px))}
+  .calmBar .pill{font-size:17px}
+  /* grown-up corner */
+  .sheet{padding:18px 16px;border-radius:22px}
+  .sheet h2{font-size:24px}
+  .panel{padding:16px 14px;border-radius:20px}
+  .panel h2{font-size:23px}
+  .tabs button{font-size:16px;padding:10px 12px 8px}
+}
+/* the name of a calm exercise never runs under the back button */
+.calmName{left:130px;right:130px;padding:0}
+@media (max-width:600px){ .calmName{left:100px;right:80px;padding:0} }
+/* ---------- short screens (a phone held sideways): compact header and strip so the games keep their room ---------- */
+@media (max-height:520px){
+  .corner{width:84px;height:calc(84px + env(safe-area-inset-top,0px));border-bottom-right-radius:84px}
+  .corner::after{width:94px;height:calc(94px + env(safe-area-inset-top,0px));border-bottom-right-radius:94px}
+  .corner svg{left:11px;top:calc(9px + env(safe-area-inset-top,0px));width:48px;height:48px}
+  .calmFab{width:56px;height:56px;top:calc(10px + env(safe-area-inset-top,0px))}
+  .calmFab svg{width:42px;height:42px}
+  .top{height:72px;padding:0 90px}
+  .title{font-size:22px;padding:.26em .8em .16em}
+  .body{top:72px;padding-bottom:12px}
+  .topbar{height:72px}
+  .hello{font-size:19px}
+  .homeTools{top:calc(8px + env(safe-area-inset-top,0px))}
+  .buddy{min-height:54px;padding:6px 12px 4px 8px;font-size:17px}
+  .buddy span{font-size:28px}
+  .musicBtn{width:54px;height:54px;font-size:26px}
+  .home .hiveScroll{top:72px;bottom:40px}
+  .brand{font-size:18px;bottom:8px}
+  .brand svg{width:24px;height:24px}
+  .loadPill{bottom:6px;font-size:15px;padding:6px 14px 4px}
+  .mean{grid-template-columns:92px 1fr;gap:10px}
+  .rail{gap:6px;padding:2px 2px 6px}
+  .cat{font-size:12px;padding:3px 2px 2px;border-radius:16px;border-width:3px}
+  .cat .e{font-size:24px}
+  .grid{grid-template-columns:repeat(auto-fill,minmax(118px,1fr));gap:10px;padding:2px 2px 8px}
+  .need{min-height:122px;padding:8px 6px 10px;border-radius:20px;gap:3px}
+  .need .pic{width:54px;height:54px;font-size:32px}
+  .need .words{font-size:14px}
+  .need .quote{font-size:12px}
+  .strip{height:auto;min-height:62px;bottom:calc(8px + env(safe-area-inset-bottom,0px));border-radius:22px;gap:12px;padding:6px 14px}
+  .strip .sp{width:46px;height:46px;font-size:28px}
+  .strip .st{font-size:18px;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+  .strip .st small{font-size:.75em}
+  .strip .speakBtn{width:44px;height:44px}
+  .sc{grid-template-columns:minmax(0,.85fr) minmax(0,1.15fr);gap:16px}
+  .scene{aspect-ratio:16/10;border-radius:24px;border-width:4px}
+  .scene .emo{font-size:clamp(50px,16vh,90px)}
+  .scene .say{font-size:16px;padding:6px 10px 4px}
+  .sceneText{font-size:17px;margin-top:8px}
+  .q{font-size:20px;margin-bottom:10px}
+  .progress{margin-bottom:8px}
+  .opt{min-height:66px;padding:8px 10px;border-radius:20px;gap:10px}
+  .opt .oe{width:50px;height:50px;font-size:30px}
+  .opt .ot{font-size:17px}
+  .opt .speakBtn{width:40px;height:40px}
+  .opts{gap:10px}
+  .opts.two .opt{min-height:120px;padding:10px}
+  .opts.two .opt .oe{width:64px;height:64px;font-size:40px}
+  .opts.faces .opt .oe{width:56px;height:56px;font-size:40px}
+  .why{font-size:16px;padding:10px 12px;border-radius:18px;margin-top:10px}
+  .why .big{font-size:30px}
+  .bigBtn{font-size:20px;padding:10px 20px 8px}
+  .colHead{font-size:16px}
+  .board{gap:10px 40px}
+  .chip{min-height:64px;padding:6px 12px;gap:10px;border-radius:20px;border-width:4px}
+  .chip .ce{font-size:30px}
+  .chip .ct{font-size:16px}
+  .slot,.card{width:clamp(96px,15vw,140px)}
+  .slot{aspect-ratio:1/.9}
+  .card{min-height:104px;border-radius:20px;padding:8px}
+  .card .ce,.slot .se{font-size:40px}
+  .card .ct,.slot .stx{font-size:14px}
+  .slot .sl{font-size:16px}
+  .slots{margin-bottom:12px}
+  .listenQ{font-size:20px;gap:10px;margin-bottom:10px}
+  .things{grid-template-columns:repeat(var(--cols,3),minmax(0,110px));gap:12px}
+  .thing{font-size:clamp(40px,14vh,64px);border-width:4px}
+  .thing .num{width:30px;height:30px;font-size:17px}
+  .done{gap:8px;padding-top:0}
+  .done .stars{font-size:52px}
+  .done h2{font-size:30px;margin:0}
+  .empty{font-size:19px;margin-top:2vh}
+  .empty .e{font-size:56px}
+  .calmName{top:calc(16px + env(safe-area-inset-top,0px));left:100px;right:100px;font-size:20px}
+  .dots{top:calc(50px + env(safe-area-inset-top,0px))}
+  .breath{width:min(64vmin,620px)}
+  .calmBar{bottom:calc(10px + env(safe-area-inset-bottom,0px))}
+  .pill{font-size:17px;padding:9px 16px 7px}
+  .parent .body{grid-template-columns:1fr;gap:10px}
+  .tabs{flex-direction:row;overflow-x:auto}
+  .tabs button{white-space:nowrap;font-size:16px;padding:8px 12px 6px}
+  .panel{padding:14px 14px}
+}
+
 @media (prefers-reduced-motion:reduce){
   *,*::before,*::after{animation-duration:.01ms!important;animation-iteration-count:1!important;transition-duration:.01ms!important}
   .bg .critter{animation:none!important}
@@ -515,12 +687,18 @@ const SFX={ctx:null,
 // Each buddy has a pack: voices/<pack>.json (hash -> [offset,length]) + voices/<pack>.bin (MP3 clips back to back).
 // Lines that are not in the pack (custom buttons, custom stories, names) fall back to the tablet's own voice or a parent recording.
 const Clips={
-  bases:['','voices/v1/'], base:'', packs:{}, decoded:new Map(), playing:[], onProgress:null,
+  // Every buddy has one voice file: <pack>.ebv = 'EBV2' + index length + index JSON + MP3 clips back to back.
+  // The index and the audio live in the same file, and every clip carries a checksum, so a damaged or altered file is refused instead of saying the wrong words.
+  bases:['','voices/v1/'], packs:{}, decoded:new Map(), playing:[], onProgress:null,
   fnv(s){ let h=0x811c9dc5; for(const b of new TextEncoder().encode(s)){ h^=b; h=Math.imul(h,0x01000193)>>>0 } return h.toString(16).padStart(8,'0') },
+  crcTable:null,
+  crc32(u8){ let T=this.crcTable; if(!T){ T=this.crcTable=new Uint32Array(256); for(let n=0;n<256;n++){ let c=n; for(let k=0;k<8;k++) c=c&1?0xEDB88320^(c>>>1):c>>>1; T[n]=c>>>0 } }
+    let c=0xFFFFFFFF; for(let i=0;i<u8.length;i++) c=T[(c^u8[i])&0xFF]^(c>>>8); return ((c^0xFFFFFFFF)>>>0).toString(16).padStart(8,'0') },
   norm(t){ return String(t==null?'':t).replace(/\s+/g,' ').trim() },
   enabled(){ return cfg.kokoro!==false },
   pack(id){ return this.packs[id] },
   status(id){ const p=this.packs[id]; return !p?'none':p.ok?'ready':p.failed?'failed':'loading' },
+  problem(id){ const p=this.packs[id]; return p&&p.failed?p.error||'unavailable':'' },
   ready(id){
     if(!id) return Promise.resolve(false);
     const p=this.packs[id]||(this.packs[id]={ok:false,failed:false,progress:0});
@@ -529,35 +707,37 @@ const Clips={
     p.loading=(async()=>{
       const ac=new AbortController(); let stall=null; const poke=(ms)=>{ clearTimeout(stall); stall=setTimeout(()=>ac.abort(),ms) };
       try{
-        poke(15000);   // no answer for 15 s -> give up, so the app never waits forever on a pack that will not come
-        // the packs may sit next to the app (flat upload) or in voices/v1/: use whichever answers
-        let ir=null, base='';
-        for(const bs of this.bases){ try{ const r0=await fetch(bs+id+'.json',{cache:'force-cache',signal:ac.signal}); if(r0.ok&&/json/.test(r0.headers.get('content-type')||'json')){ ir=r0; base=bs; break } }catch(e){ if(ac.signal.aborted) throw e } }
-        if(!ir) throw new Error('no index');
-        p.index=(await ir.json()).h||{};
-        poke(15000);
-        const r=await fetch(base+id+'.mp3',{cache:'force-cache',signal:ac.signal}); if(!r.ok) throw new Error('no pack');
-        const total=+r.headers.get('content-length')||0;
+        // the voice file may sit next to the app or in voices/v1/: use whichever answers
+        let r=null; poke(15000);
+        for(const bs of this.bases){ try{ const r0=await fetch(bs+id+'.ebv',{cache:'force-cache',signal:ac.signal}); if(r0.ok){ r=r0; break } }catch(e){ if(ac.signal.aborted) throw new Error('timeout') } }
+        if(!r){ p.error='missing'; throw new Error('voice file not found: '+id+'.ebv') }
+        const total=+r.headers.get('content-length')||0; let buf;
         if(r.body){ const reader=r.body.getReader(), chunks=[]; let got=0;
           for(;;){ poke(20000); const {done,value}=await reader.read(); if(done) break; chunks.push(value); got+=value.length; if(total){ p.progress=got/total; if(this.onProgress) this.onProgress(id,Math.min(.99,p.progress)) } }
-          const all=new Uint8Array(got); let o=0; for(const c of chunks){ all.set(c,o); o+=c.length } p.buf=all.buffer }
-        else p.buf=await r.arrayBuffer();
-        // integrity: the file must be whole (a half-uploaded pack would play garbage or nothing)
-        let need=0; for(const k in p.index){ const e=p.index[k]; need=Math.max(need,e[0]+e[1]) }
-        if(p.buf.byteLength<need) throw new Error('pack incomplete: '+p.buf.byteLength+' of '+need+' bytes');
+          const all=new Uint8Array(got); let o=0; for(const ch of chunks){ all.set(ch,o); o+=ch.length } buf=all }
+        else buf=new Uint8Array(await r.arrayBuffer());
         clearTimeout(stall);
-        p.ok=true; p.progress=1; if(this.onProgress) this.onProgress(id,1); return true
-      }catch(e){ clearTimeout(stall); console.warn('voice pack unavailable',id,e); p.failed=true; if(this.onProgress) this.onProgress(id,-1); return false }
+        // unpack + verify
+        if(buf.length<8||String.fromCharCode(buf[0],buf[1],buf[2],buf[3])!=='EBV2'){ p.error='damaged'; throw new Error('not a voice file') }
+        let index,data;
+        try{ const ilen=new DataView(buf.buffer,buf.byteOffset,buf.byteLength).getUint32(4,true); index=JSON.parse(new TextDecoder().decode(buf.subarray(8,8+ilen))); data=buf.subarray(8+ilen) }
+        catch(err){ p.error='damaged'; throw new Error('voice file index unreadable') }
+        if(data.length!==index.size){ p.error='damaged'; throw new Error('voice file incomplete: '+data.length+' of '+index.size+' bytes') }
+        if(index.crc&&this.crc32(data)!==index.crc){ p.error='damaged'; throw new Error('voice file checksum mismatch') }
+        p.index=index.h||{}; p.data=data; p.ok=true; p.progress=1; if(this.onProgress) this.onProgress(id,1); return true
+      }catch(e){ clearTimeout(stall); console.warn('voice pack unavailable',id,e); p.failed=true; p.error=p.error||(ac.signal.aborted?'timeout':'unavailable'); if(this.onProgress) this.onProgress(id,-1); return false }
       finally{ p.loading=null }
     })();
     return p.loading },
   has(id,key){ const p=this.packs[id]; return !!(p&&p.ok&&p.index[this.fnv(key)]) },
   async buffer(id,key){
     const ck=id+':'+key; if(this.decoded.has(ck)) return this.decoded.get(ck);
-    const p=this.packs[id]; const e=p&&p.index[this.fnv(key)]; if(!e) return null;
+    const p=this.packs[id]; const e=p&&p.ok&&p.index[this.fnv(key)]; if(!e) return null;
     const ctx=SFX.raw(); if(!ctx) return null;
-    const slice=p.buf.slice(e[0],e[0]+e[1]);
-    const ab=await new Promise((res,rej)=>{ const r=ctx.decodeAudioData(slice,res,rej); if(r&&r.then) r.then(res,rej) });
+    const bytes=p.data.slice(e[0],e[0]+e[1]);
+    if(e[2]&&this.crc32(bytes)!==e[2]){ console.warn('clip checksum mismatch',id,key); return null }   // never play the wrong words
+    let ab=null;
+    try{ ab=await new Promise((res,rej)=>{ const r=ctx.decodeAudioData(bytes.buffer,res,rej); if(r&&r.then) r.then(res,rej) }) }catch(err){ console.warn('clip decode failed',id,key,err); return null }
     if(this.decoded.size>300){ const first=this.decoded.keys().next().value; this.decoded.delete(first) }
     this.decoded.set(ck,ab); return ab },
   async mediaBuffer(dataUrl){
@@ -598,7 +778,7 @@ const Clips={
 const Live={
   ids:{lily:'af_heart',mia:'bf_emma',rosie:'af_bella',leo:'am_puck',max:'am_michael'},
   tts:null, state:'idle', token:0, audio:null, onState:null,
-  enabled(){ return cfg.live!==false },
+  enabled(){ return cfg.live===true },
   set(s){ this.state=s; if(this.onState) this.onState(s) },
   start(){
     if(this.state==='ready') return Promise.resolve(true);
@@ -685,7 +865,8 @@ const Voice={
     if(opts.other){ const o=otherBuddy(b); if(o.pack&&Clips.status(o.pack)==='ready') b=o; else if(o.pack) Clips.ready(o.pack) }   // the other voice only when it is already loaded
     if(Clips.enabled()&&b.pack){
       Clips.stop();
-      const ok=await Clips.ready(b.pack);
+      // wait a moment for a voice that is still downloading; after that this line uses the tablet voice and the download carries on
+      const ok=await Promise.race([Clips.ready(b.pack),wait(Clips.status(b.pack)==='ready'?0:2500).then(()=>false)]);
       if(ok){ const segs=Clips.resolve(b.pack,text,{slow:(opts.rateMul||1)<.9}); 
         if(segs){ if(opts.el) this.mark(opts.el); Music.duck(true); this.works=true; hideVoiceNote();
           const played=await Clips.play(b.pack,segs,{rate:cfg.speed||1});
@@ -1255,7 +1436,7 @@ function viewLevels(fid){
     const b=h('button',{class:'lv'+(i===next?' next':''),'aria-label':`Level ${i+1}, ${L.name||''}`},h('div',{class:'rim'}),art);
     b.addEventListener('click',()=>{ if(busy) return; SFX.pop(); Voice.say([`Level ${i+1}.`,L.name||'']); go(()=>playLevel(fid,i),b) });
     hive.append(b) });
-  const lay=()=>{ const n=lv.length, cols=5, rows=Math.ceil(n/cols);
+  const lay=()=>{ const n=lv.length, cols=innerWidth<innerHeight?3:5, rows=Math.ceil(n/cols);
     const W=innerWidth-60, H=innerHeight-150;
     let th=Math.min(W/(cols+.5)/1.08/.866, H/(.75*rows+.25)/1.04, 200); th=Math.max(th,112);
     const tw=th*.866, g=th*.07, col=tw+g;
@@ -1327,6 +1508,7 @@ function viewMean(){
   const rail=h('div',{class:'rail',role:'tablist'}), grid=h('div',{class:'grid'});
   const strip=h('div',{class:'strip hint',onclick:()=>{ if(last) speakItem(last) }},h('div',{class:'sp'},'👆'),h('div',{class:'st'},'Tap a picture to say it'));
   v.append(h('div',{class:'body'},h('div',{class:'mean'},rail,grid)),strip);
+  try{ const ro=new ResizeObserver(()=>v.style.setProperty('--stripH',(strip.offsetHeight+30)+'px')); ro.observe(strip); const prev=cleanup; cleanup=()=>{ ro.disconnect(); if(prev) prev() } }catch(e){}
   function speakItem(it,el){ strip.classList.remove('flash'); void strip.offsetWidth; strip.classList.add('flash');
     return it.kind==='script'?Voice.play(it.audio,it.meaning,{el}):Voice.play(it.audio,it.say,{el}) }
   function showStrip(it){ strip.classList.remove('hint'); strip.innerHTML='';
@@ -1357,9 +1539,9 @@ const PAIR=['#3DAE78','#3B97D3','#B06BD6','#E08A2E'];
 function viewMatcher(li){
   const v=makeView('quiet'); levelHeader(v,'match',li,`Say it, mean it ${li+1}`);
   const body=h('div',{class:'body'}); v.append(body);
-  let round=[], sel=null, matched=new Set(), pairs=0, mistakes=0, lines, board;
+  let round=[], sel=null, matched=new Set(), pairs=0, mistakes=0, lines, board, finished=false;
   function start(){
-    body.innerHTML=''; sel=null; matched=new Set(); pairs=0; mistakes=0;
+    body.innerHTML=''; sel=null; matched=new Set(); pairs=0; mistakes=0; finished=false;
     const pool=cfg.scripts.filter(s=>s.inGame&&s.phrase&&s.meaning);
     if(pool.length<2){ body.append(h('div',{class:'empty'},h('div',{class:'e'},'💬'),'A grown-up can add phrases in the grown-up corner, then we can play.')); return }
     const want=Math.min(li<5?2:li<10?3:4,pool.length), st=(li*want)%pool.length; round=[];
@@ -1384,8 +1566,9 @@ function viewMatcher(li){
       const color=PAIR[pairs%PAIR.length]; pairs++;
       [a.el,c].forEach(x=>{ x.classList.add('matched'); x.style.setProperty('--pc',color); x.append(h('span',{class:'badge'},pairs)) });
       matched.add(s.id+'phrase'); matched.add(s.id+'meaning'); drawLines(); SFX.chime();
+      const lastPair=pairs===round.length;
       await Voice.say(`${s.phrase} means: ${s.meaning}.`);
-      if(pairs===round.length&&v.isConnected) setTimeout(()=>{ if(v.isConnected) finishScreen(body,'match',li,mistakes===0?3:mistakes<=2?2:1,start) },400) }
+      if(lastPair&&v.isConnected&&!finished){ finished=true; setTimeout(()=>{ if(v.isConnected) finishScreen(body,'match',li,mistakes===0?3:mistakes<=2?2:1,start) },400) } }
     else{ mistakes++; [a.el,c].forEach(x=>{ x.classList.add('nudge'); setTimeout(()=>x.classList.remove('nudge'),520) }); SFX.soft(); Voice.say('Hmm, not that one. Let’s try another.') } }
   function drawLines(){ if(!board||!board.isConnected) return; lines.innerHTML=''; const b=board.getBoundingClientRect();
     round.forEach(s=>{ if(!matched.has(s.id+'phrase')) return;
@@ -1404,17 +1587,18 @@ function viewOrder(li){
   const v=makeView('quiet'); levelHeader(v,'order',li,title);
   const body=h('div',{class:'body'}); v.append(body);
   const labels=steps.length===3?['First','Next','Last']:['First','Next','Then','Last'];
-  let filled=0, mistakes=0, timer=0;
+  let filled=0, mistakes=0, timer=0, finished=false;
   function start(){
-    body.innerHTML=''; filled=0; mistakes=0;
+    body.innerHTML=''; filled=0; mistakes=0; finished=false;
     const slots=h('div',{class:'slots'}), pile=h('div',{class:'pile'});
     const slotEls=steps.map((_,k)=>{ const s=h('div',{class:'slot'},h('span',{class:'sl'},labels[k])); slots.append(s); return s });
     let order=shuffle(range(steps.length)); if(order.every((x,k)=>x===k)) order=order.reverse();
     order.forEach(k=>{ const [e,t]=steps[k]; const c=h('button',{class:'card','aria-label':t},h('span',{class:'ce'},e),h('span',{class:'ct'},t));
       c.addEventListener('click',async()=>{
         if(k===filled){ SFX.chime(); c.classList.add('used'); const s=slotEls[k]; s.classList.add('filled'); s.innerHTML=''; s.append(h('span',{class:'sl'},labels[k]),h('span',{class:'se'},e),h('span',{class:'stx'},t)); filled++;
+          const lastOne=filled===steps.length;
           await Voice.say(`${labels[k]}, ${t}.`); if(!v.isConnected) return;
-          if(filled===steps.length){ await wait(300); await Voice.say(steps.map((s2,j)=>`${labels[j]}, ${s2[1]}.`)); if(v.isConnected) finishScreen(body,'order',li,mistakes===0?3:mistakes<=2?2:1,start) } }
+          if(lastOne&&!finished){ finished=true; await wait(300); await Voice.say(steps.map((s2,j)=>`${labels[j]}, ${s2[1]}.`)); if(v.isConnected) finishScreen(body,'order',li,mistakes===0?3:mistakes<=2?2:1,start) } }
         else{ mistakes++; SFX.soft(); c.classList.add('nudge'); setTimeout(()=>c.classList.remove('nudge'),520); Voice.say(`Hmm. What comes ${filled===0?'first':'next'}?`) } });
       pile.append(c) });
     body.append(h('p',{class:'listenQ'},speakBtn(()=>[title,`What comes ${filled===0?'first':'next'}?`],'Hear it'),'What comes first?'),slots,pile);
@@ -1439,7 +1623,7 @@ function viewListen(li){
         if(it===R.targets[step]){ step++; b.classList.add('ok'); if(R.targets.length>1) b.append(h('span',{class:'num'},step)); SFX.pop();
           if(step===R.targets.length){ SFX.chime(); await Voice.say(['Great listening!','You found it!','Yes! Well done!'][ri%3]); if(!v.isConnected) return; ri++;
             if(ri<rounds.length) round(); else finishScreen(body,'listen',li,mistakes===0?3:mistakes<=2?2:1,start) } }
-        else{ mistakes++; SFX.soft(); b.classList.add('nudge'); setTimeout(()=>b.classList.remove('nudge'),520); await Voice.say('Hmm, listen again.'); if(v.isConnected) Voice.say(R.segs||R.say,{el:qb}) } });
+        else{ mistakes++; SFX.soft(); b.classList.add('nudge'); setTimeout(()=>b.classList.remove('nudge'),520); const myRound=ri; await Voice.say('Hmm, listen again.'); if(v.isConnected&&ri===myRound&&qb.isConnected) Voice.say(R.segs||R.say,{el:qb}) } });
       grid.append(b) });
     body.append(p,h('p',{class:'listenQ'},qb,R.say),grid);
     clearTimeout(timer); timer=setTimeout(()=>Voice.say(R.segs||R.say,{el:qb}),650) }
@@ -1557,13 +1741,14 @@ function viewParent(){
   function voices(){
     Voice.load();
     const n=Voice.voices.length, best=Voice.best(), kok=Clips.enabled();
-    panel.append(h('h2',null,'Voice buddies'),h('p',{class:'muted'},'Every line in the games was recorded with Kokoro, a natural-sounding AI voice, so the buddies never sound robotic. Three girls and two boys. Anything you type yourself (new buttons, new stories, the name) is spoken live by the same Kokoro voice, or by a recording you make.'));
+    panel.append(h('h2',null,'Voice buddies'),h('p',{class:'muted'},'Every line in the games was recorded with Kokoro, a natural-sounding AI voice, so the buddies never sound robotic. Three girls and two boys. Anything you type yourself (new buttons, new stories, the name) is spoken by the tablet’s own voice, by a recording you make, or live by Kokoro if you turn that on below.'));
     panel.append(toggleField('Use the natural Kokoro voices (recommended)',kok,x=>{ cfg.kokoro=x; Store.later(); drawPanel(); if(x) loadPill(activeBuddy()) }));
     const liveRow=h('p',{class:'muted',style:'margin:-4px 0 12px'});
     const drawLive=()=>{ const s=Live.state; liveRow.textContent=s==='ready'?'✅ Live voice is ready. Anything you type is spoken by the same Kokoro voice.':s==='loading'?'⏳ Getting the live voice (about 90 MB, once)…':s==='failed'?'⚠️ Live voice could not load (needs internet the first time). The tablet voice is used instead.':'Live voice not downloaded yet.' };
     Live.onState=()=>{ if(liveRow.isConnected) drawLive() }; drawLive();
     panel.append(toggleField('Live Kokoro voice for words you add (custom buttons, stories, names)',Live.enabled(),x=>{ cfg.live=x; Store.later(); if(x) Live.start(); else Live.stop(); drawPanel() }),liveRow);
     if(Live.enabled()&&Live.state==='idle') panel.append(h('div',{class:'row',style:'margin-bottom:12px'},h('button',{class:'btn',onclick:()=>{ Live.start() }},'⬇ Get the live voice now (on wifi)')));
+    if(!Live.enabled()) liveRow.textContent='Off. Words you add are spoken by the tablet’s own voice. Turning this on downloads about 90 MB once (experimental).';
     const grid=h('div',{class:'vcGrid'});
     const sys=Voice.voices.filter(x=>/^en/i.test(x.lang)).concat(Voice.voices.filter(x=>!/^en/i.test(x.lang))).sort((a,b)=>voiceQuality(b)-voiceQuality(a));
     cfg.voices.forEach(b=>{
@@ -1573,7 +1758,7 @@ function viewParent(){
       if(kok){
         const st=Clips.status(b.pack); const pk=h('select',{'aria-label':'Kokoro voice'}); Object.entries(PACKS).forEach(([id,l])=>pk.append(h('option',{value:id},l))); pk.value=b.pack||'lily';
         pk.addEventListener('change',()=>{ b.pack=pk.value; b.kokoro=PACKS[b.pack]; b.kind=/boy/.test(PACKS[b.pack])?'boy':'girl'; Store.later(); loadPill(b); Voice.say(buddyHello(b),{buddy:b}) });
-        card.append(h('label',{class:'sl'},h('span',null,'Kokoro voice'),pk),h('p',{class:'muted',style:'margin:6px 0 0'},st==='ready'?'✅ Ready on this tablet':st==='failed'?'⚠️ Voice pack not found. Upload the voices folder with the app.':st==='loading'?'⏳ Downloading…':'Downloads once, then works offline'));
+        card.append(h('label',{class:'sl'},h('span',null,'Kokoro voice'),pk),h('p',{class:'muted',style:'margin:6px 0 0'},st==='ready'?'✅ Ready on this tablet':st==='failed'?(Clips.problem(b.pack)==='damaged'?`⚠️ The voice file ${b.pack}.ebv is damaged. Upload a fresh copy next to the app.`:Clips.problem(b.pack)==='missing'?`⚠️ The voice file ${b.pack}.ebv was not found. Upload it next to the app.`:`⚠️ Could not download ${b.pack}.ebv. Check the internet and reload.`):st==='loading'?'⏳ Downloading…':'Downloads once, then works offline'));
       } else {
         const kind=h('div',{class:'chips',style:'margin-top:8px'}); const drawKind=()=>{ kind.innerHTML=''; [['girl','👧 Girl'],['boy','👦 Boy']].forEach(([k,l])=>kind.append(h('button',{type:'button','aria-pressed':String(b.kind===k),onclick:()=>{ b.kind=k; b.voiceURI=''; sel.value=''; drawKind(); Store.later() }},l))) };
         const sel=h('select',{'aria-label':'Base voice'}); sel.append(h('option',{value:''},'Automatic '+(b.kind==='boy'?'boy':'girl')+' voice')); sys.forEach(x=>sel.append(h('option',{value:x.voiceURI},`${x.name} (${x.lang})${voiceQuality(x)>=5?' ★':''}`))); sel.value=b.voiceURI||'';
