@@ -582,6 +582,14 @@ input,textarea,select{font:inherit;color:var(--ink)}
 @media (max-height:520px){ .calmName{left:160px;right:160px} }
 @media (max-width:600px){ .title{white-space:normal;text-overflow:clip;font-size:clamp(16px,4.6vw,21px);line-height:1.05;padding:.32em .8em .24em;border-radius:22px} }
 
+/* four answer cards in a 2x2 grid */
+.opts.four{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.opts.four .opt{flex-direction:column;justify-content:center;text-align:center;min-height:150px;padding:14px 10px;gap:8px}
+.opts.four .opt .oe{width:88px;height:88px;font-size:54px}
+.opts.four .opt .speakBtn{position:absolute;right:10px;top:10px;width:40px;height:40px}
+@media (max-width:600px){ .opts.four .opt{min-height:120px} .opts.four .opt .oe{width:64px;height:64px;font-size:40px} }
+@media (max-height:520px){ .opts.four{gap:8px} .opts.four .opt{min-height:96px;padding:8px} .opts.four .opt .oe{width:50px;height:50px;font-size:32px} }
+
 @media (prefers-reduced-motion:reduce){
   *,*::before,*::after{animation-duration:.01ms!important;animation-iteration-count:1!important;transition-duration:.01ms!important}
   .bg .critter{animation:none!important}
@@ -1438,6 +1446,137 @@ const FEATS=[
   {id:'iyou',title:'I or you?',art:'iyou',color:'#E3F6EF',levels:()=>IY.map((x,i)=>({name:x[1]+'…',emoji:x[2][0][0]})),qs:li=>iyQuestions(li)}
 ];
 const feat=id=>FEATS.find(f=>f.id===id);
+/* ================= FIVE MORE GAMES (quiz engine): Odd one out, Opposites, Finish the sentence, What do you say?, Rhyme time ================= */
+// Every option speaks its own short clip, so a new game needs only its questions and words recorded.
+const YES_IS=['Yes!'], NOT_=['Hmm, not'];
+const optsOf=(list,correctFirst)=>list.map((o,i)=>({emoji:o[0],text:o[1],correct:i===0,why:i===0?`Yes! ${o[1]}.`:`Hmm, not ${o[1].charAt(0).toLowerCase()+o[1].slice(1)}.`,whySay:i===0?['Yes!',o[1]]:['Hmm, not',o[1]]}));
+
+/* ---- Odd one out: 4 pictures, one does not belong ---- */
+// each level: [name, emoji, [ [question, odd, same1, same2, same3], x3 ]]  items are [emoji,name]
+const ODD=[
+  ['Animals','🐶',[['Which one is not an animal?',['🍎','An apple'],['🐶','A dog'],['🐱','A cat'],['🐄','A cow']],['Which one is not an animal?',['🚗','A car'],['🐟','A fish'],['🐦','A bird'],['🐸','A frog']],['Which one is not an animal?',['👟','A shoe'],['🐘','An elephant'],['🐰','A bunny'],['🐷','A pig']]]],
+  ['Food','🍎',[['Which one is not a food?',['⚽','A ball'],['🍌','A banana'],['🍪','A cookie'],['🥕','A carrot']],['Which one is not a food?',['🧸','A teddy bear'],['🍕','Pizza'],['🍇','Grapes'],['🥪','A sandwich']],['Which one is not a food?',['🚌','A bus'],['🍓','A strawberry'],['🧀','Cheese'],['🍞','Bread']]]],
+  ['Clothes','👕',[['Which one is not clothes?',['🍌','A banana'],['👕','A shirt'],['👖','Pants'],['🧦','A sock']],['Which one is not clothes?',['🐱','A cat'],['🧢','A cap'],['🧤','Gloves'],['🧥','A jacket']],['Which one is not clothes?',['🥄','A spoon'],['👗','A dress'],['👟','A shoe'],['🧣','A scarf']]]],
+  ['Toys','🧸',[['Which one is not a toy?',['🥕','A carrot'],['🧸','A teddy bear'],['🧱','A block'],['🪁','A kite']],['Which one is not a toy?',['🪥','A toothbrush'],['⚽','A ball'],['🚂','A toy train'],['🪀','A yo-yo']],['Which one is not a toy?',['☂️','An umbrella'],['🎈','A balloon'],['🧩','A puzzle'],['🪆','A doll']]]],
+  ['Things that go','🚗',[['Which one does not go?',['🛏️','A bed'],['🚗','A car'],['🚌','A bus'],['🚲','A bike']],['Which one does not go?',['🍪','A cookie'],['✈️','A plane'],['🚂','A train'],['⛵','A boat']],['Which one does not go?',['📚','A book'],['🚁','A helicopter'],['🚜','A tractor'],['🛵','A scooter']]]],
+  ['Red things','🔴',[['Which one is not red?',['🍌','A banana'],['🍎','An apple'],['🍓','A strawberry'],['🍒','Cherries']],['Which one is not red?',['🥦','Broccoli'],['🚒','A fire truck'],['🌹','A rose'],['🍅','A tomato']],['Which one is not red?',['🫐','Blueberries'],['🎈','A red balloon'],['🧯','A fire extinguisher'],['🦞','A lobster']]]],
+  ['Yellow things','🟡',[['Which one is not yellow?',['🍎','An apple'],['🍌','A banana'],['🌟','A star'],['🍋','A lemon']],['Which one is not yellow?',['🐸','A frog'],['🐥','A chick'],['🌻','A sunflower'],['🧀','Cheese']],['Which one is not yellow?',['🍇','Grapes'],['🌽','Corn'],['🚕','A taxi'],['🍍','A pineapple']]]],
+  ['In the sky','☁️',[['Which one is not in the sky?',['🐟','A fish'],['☁️','A cloud'],['🌙','The moon'],['🐦','A bird']],['Which one is not in the sky?',['🚗','A car'],['✈️','A plane'],['🌈','A rainbow'],['☀️','The sun']],['Which one is not in the sky?',['🛏️','A bed'],['🎈','A balloon'],['🪁','A kite'],['⭐','A star']]]],
+  ['In the water','🌊',[['Which one does not live in water?',['🐶','A dog'],['🐟','A fish'],['🐙','An octopus'],['🦀','A crab']],['Which one does not live in water?',['🐔','A chicken'],['🐳','A whale'],['🐬','A dolphin'],['🐢','A sea turtle']],['Which one does not go in water?',['📚','A book'],['⛵','A boat'],['🦆','A duck'],['🏄','A surfboard']]]],
+  ['In the kitchen','🍳',[['Which one is not from the kitchen?',['🛏️','A bed'],['🥄','A spoon'],['🍳','A pan'],['🥣','A bowl']],['Which one is not from the kitchen?',['🚲','A bike'],['🍽️','A plate'],['🥛','A cup of milk'],['🔪','A knife']],['Which one is not from the kitchen?',['🪥','A toothbrush'],['🧊','Ice'],['🧈','Butter'],['🥚','An egg']]]],
+  ['Big and small','🐘',[['Which one is small?',['🐜','An ant'],['🐘','An elephant'],['🦒','A giraffe'],['🐋','A whale']],['Which one is big?',['🏠','A house'],['🐞','A ladybug'],['🍬','A candy'],['🔑','A key']],['Which one is small?',['🐭','A mouse'],['🚌','A bus'],['🌳','A tree'],['🏔️','A mountain']]]],
+  ['Hot and cold','🔥',[['Which one is cold?',['🧊','Ice'],['🔥','Fire'],['☀️','The sun'],['🍵','Hot tea']],['Which one is hot?',['🔥','Fire'],['🧊','Ice'],['⛄','A snowman'],['🍦','Ice cream']],['Which one is cold?',['⛄','A snowman'],['🌋','A volcano'],['🍲','Hot soup'],['🕯️','A candle']]]],
+  ['Things we wear','🧢',[['Which one do we not wear?',['🍕','Pizza'],['🧢','A cap'],['👓','Glasses'],['⌚','A watch']],['Which one do we not wear?',['🚗','A car'],['🧦','Socks'],['🧤','Gloves'],['👑','A crown']],['Which one do we not wear?',['🪑','A chair'],['🎒','A backpack'],['👢','Boots'],['🧣','A scarf']]]],
+  ['Things we eat with','🥄',[['Which one do we not eat with?',['✂️','Scissors'],['🥄','A spoon'],['🍴','A fork'],['🥢','Chopsticks']],['Which one is not for eating?',['🧸','A teddy bear'],['🍎','An apple'],['🥪','A sandwich'],['🍌','A banana']],['Which one is not a drink?',['🍞','Bread'],['🥛','Milk'],['🧃','Juice'],['💧','Water']]]],
+  ['Mixed up','🎲',[['Which one is different?',['🐶','A dog'],['🍎','An apple'],['🍌','A banana'],['🍇','Grapes']],['Which one is different?',['🚗','A car'],['🧸','A teddy bear'],['🧱','A block'],['🪁','A kite']],['Which one is different?',['⭐','A star'],['🐱','A cat'],['🐭','A mouse'],['🐰','A bunny']]]]
+];
+function oddQs(li){ const [,,qs]=ODD[li]; return qs.map(([q,odd,...same])=>({text:'',emojis:'🔍',question:q,fx:null,photo:null,four:true,
+  options:[{emoji:odd[0],text:odd[1],correct:true,why:`Yes! ${odd[1]} is different.`,whySay:['Yes!',odd[1],'is different.']}].concat(same.map(s=>({emoji:s[0],text:s[1],correct:false,why:`Hmm, ${s[1].charAt(0).toLowerCase()+s[1].slice(1)} belongs with the others.`,whySay:['Hmm, not',s[1]]})))})) }
+
+/* ---- Opposites ---- */
+// level: [name, emoji, [ [scene emojis, sentence, question, correct, wrong, wrong] x3 ]]
+const OPP=[
+  ['Hot and cold','🔥',[['☀️🧊','The sun is hot.','Ice is…',['🧊','Cold'],['🔥','Hot'],['🐘','Big']],['🍵🍦','Tea is hot.','Ice cream is…',['🍦','Cold'],['🍵','Hot'],['🐭','Small']],['⛄🔥','A snowman is cold.','Fire is…',['🔥','Hot'],['⛄','Cold'],['🐢','Slow']]]],
+  ['Big and small','🐘',[['🐘🐭','An elephant is big.','A mouse is…',['🐭','Small'],['🐘','Big'],['🔥','Hot']],['🏠🐞','A house is big.','A ladybug is…',['🐞','Small'],['🏠','Big'],['🧊','Cold']],['🐜🐋','An ant is small.','A whale is…',['🐋','Big'],['🐜','Small'],['😴','Sleepy']]]],
+  ['Fast and slow','🐢',[['🐆🐢','A cheetah is fast.','A turtle is…',['🐢','Slow'],['🐆','Fast'],['🐘','Big']],['🚀🐌','A rocket is fast.','A snail is…',['🐌','Slow'],['🚀','Fast'],['🔥','Hot']],['🐢🐇','A turtle is slow.','A bunny is…',['🐇','Fast'],['🐢','Slow'],['🧊','Cold']]]],
+  ['Up and down','⬆️',[['🎈⬇️','A balloon goes up.','A ball falls…',['⬇️','Down'],['⬆️','Up'],['🐢','Slow']],['🪜⬆️','We climb up the ladder.','Then we slide…',['⬇️','Down'],['⬆️','Up'],['🐘','Big']],['🌧️🌱','Rain comes down.','A plant grows…',['⬆️','Up'],['⬇️','Down'],['🔥','Hot']]]],
+  ['Happy and sad','😊',[['😊😢','A smile is happy.','Tears are…',['😢','Sad'],['😊','Happy'],['🐘','Big']],['🎂😢','A birthday is happy.','A lost toy is…',['😢','Sad'],['😊','Happy'],['🧊','Cold']],['😢😊','Crying is sad.','Laughing is…',['😊','Happy'],['😢','Sad'],['🐢','Slow']]]],
+  ['Wet and dry','💧',[['🌧️🏜️','Rain is wet.','Sand in the sun is…',['🏜️','Dry'],['🌧️','Wet'],['🐘','Big']],['🛁🧻','The bath is wet.','A towel makes us…',['🧻','Dry'],['🛁','Wet'],['😢','Sad']],['🏜️🌊','A desert is dry.','The sea is…',['🌊','Wet'],['🏜️','Dry'],['🔥','Hot']]]],
+  ['Loud and quiet','🔊',[['🥁🤫','A drum is loud.','A whisper is…',['🤫','Quiet'],['🥁','Loud'],['🐘','Big']],['🚒📚','A fire truck is loud.','A library is…',['📚','Quiet'],['🚒','Loud'],['💧','Wet']],['🤫🦁','A whisper is quiet.','A lion roar is…',['🦁','Loud'],['🤫','Quiet'],['😢','Sad']]]],
+  ['Open and closed','🚪',[['📖📕','The book is open.','Now the book is…',['📕','Closed'],['📖','Open'],['🐢','Slow']],['👀😑','My eyes are open.','When I sleep they are…',['😑','Closed'],['👀','Open'],['🔥','Hot']],['🚪🏃','The door is closed.','To go out, we…',['🚪','Open it'],['😴','Sleep'],['🍎','Eat it']]]],
+  ['Day and night','🌞',[['🌞🌙','The sun is for day.','The moon is for…',['🌙','Night'],['🌞','Day'],['🐘','Big']],['🌙⭐','We sleep at night.','We play in the…',['🌞','Day'],['🌙','Night'],['🧊','Cold']],['🌙🌞','At night it is dark.','In the day it is…',['🌞','Light'],['🌙','Dark'],['💧','Wet']]]],
+  ['Full and empty','🥛',[['🥛🫙','This cup is full.','This jar is…',['🫙','Empty'],['🥛','Full'],['🐢','Slow']],['🎒📭','My bag is full.','The mailbox is…',['📭','Empty'],['🎒','Full'],['🔥','Hot']],['🫙🧺','The jar is empty.','The basket is…',['🧺','Full'],['🫙','Empty'],['😢','Sad']]]],
+  ['On and off','💡',[['💡🌑','The light is on.','Now the light is…',['🌑','Off'],['💡','On'],['🐘','Big']],['📺🛑','The TV is on.','Press the button and it is…',['🛑','Off'],['📺','On'],['💧','Wet']],['🌑💡','The lamp is off.','Flip the switch and it is…',['💡','On'],['🌑','Off'],['🐢','Slow']]]],
+  ['In and out','📦',[['📦🐱','The cat is in the box.','Now the cat jumps…',['🐱','Out'],['📦','In'],['🔥','Hot']],['🏠🌳','We are in the house.','To play we go…',['🌳','Out'],['🏠','In'],['😢','Sad']],['🌧️🏠','It is raining out.','So we stay…',['🏠','In'],['🌳','Out'],['🐘','Big']]]],
+  ['Long and short','📏',[['🦒🐭','A giraffe neck is long.','A mouse tail is…',['🐭','Short'],['🦒','Long'],['🔥','Hot']],['🚂🚗','A train is long.','A car is…',['🚗','Short'],['🚂','Long'],['💧','Wet']],['✏️📏','A crayon is short.','A ruler is…',['📏','Long'],['✏️','Short'],['😢','Sad']]]],
+  ['Clean and dirty','🧼',[['🧼🐷','Clean hands smell nice.','Muddy hands are…',['🐷','Dirty'],['🧼','Clean'],['🐢','Slow']],['👕🎨','My shirt is clean.','After painting it is…',['🎨','Dirty'],['👕','Clean'],['🔥','Hot']],['🐷🛁','The pig is dirty.','After a bath it is…',['🛁','Clean'],['🐷','Dirty'],['🐘','Big']]]],
+  ['Soft and hard','🧸',[['🧸🪨','A teddy is soft.','A rock is…',['🪨','Hard'],['🧸','Soft'],['💧','Wet']],['🛏️🧱','A pillow is soft.','A brick is…',['🧱','Hard'],['🛏️','Soft'],['😢','Sad']],['🪨☁️','A rock is hard.','A cloud looks…',['☁️','Soft'],['🪨','Hard'],['🔥','Hot']]]]
+];
+function oppQs(li){ const [,,qs]=OPP[li]; return qs.map(([em,text,q,...o])=>({text,emojis:em,question:q,fx:null,photo:null,options:optsOf(o)})) }
+
+/* ---- Finish the sentence ---- */
+const FILL=[
+  ['Eating','🍽️',[['🥣','I eat soup with a…',['🥄','Spoon'],['🎩','Hat'],['👟','Shoe']],['🥛','I drink milk from a…',['🥤','Cup'],['🧦','Sock'],['📚','Book']],['🍎','An apple is a…',['🍎','Fruit'],['🚗','Car'],['🧸','Toy']]]],
+  ['Getting dressed','👕',[['🦶','On my feet I wear…',['👟','Shoes'],['🧢','A cap'],['🧤','Gloves']],['🧢','On my head I wear a…',['🧢','Cap'],['🧦','Sock'],['👖','Pants']],['🌧️','In the rain I take an…',['☂️','Umbrella'],['🍦','Ice cream'],['🎈','Balloon']]]],
+  ['Bedtime','🛏️',[['😴','At night I sleep in my…',['🛏️','Bed'],['🛁','Bathtub'],['🚗','Car']],['🥶','When I am cold I use a…',['🛌','Blanket'],['🥄','Spoon'],['⚽','Ball']],['📖','Before bed we read a…',['📚','Book'],['🍕','Pizza'],['🪥','Toothbrush']]]],
+  ['Washing','🧼',[['🙌','I wash my hands with…',['🧼','Soap'],['🍪','Cookies'],['🧱','Blocks']],['😁','I brush my teeth with a…',['🪥','Toothbrush'],['🥄','Spoon'],['🖍️','Crayon']],['🛁','After the bath I dry with a…',['🧻','Towel'],['🎩','Hat'],['🥛','Cup']]]],
+  ['Playing','⚽',[['⚽','I kick the…',['⚽','Ball'],['🛏️','Bed'],['🥛','Milk']],['🧱','I build a tower with…',['🧱','Blocks'],['🍌','Bananas'],['🧦','Socks']],['🖍️','I draw with a…',['🖍️','Crayon'],['🥄','Spoon'],['👟','Shoe']]]],
+  ['Animals','🐶',[['🐶','A dog says…',['🐶','Woof'],['🐱','Meow'],['🐄','Moo']],['🐱','A cat says…',['🐱','Meow'],['🐶','Woof'],['🐸','Ribbit']],['🐄','A cow says…',['🐄','Moo'],['🐥','Peep'],['🐷','Oink']]]],
+  ['Weather','🌦️',[['🌧️','When it rains I use an…',['☂️','Umbrella'],['🍦','Ice cream'],['🧸','Teddy bear']],['☀️','When it is sunny I wear a…',['🧢','Cap'],['🧥','Winter coat'],['🧣','Scarf']],['❄️','When it snows I wear…',['🧤','Gloves'],['🩴','Flip flops'],['🩳','Shorts']]]],
+  ['At school','🏫',[['📚','At school I read a…',['📚','Book'],['🍕','Pizza'],['🛏️','Bed']],['✏️','I write with a…',['✏️','Pencil'],['🥄','Spoon'],['🪥','Toothbrush']],['🎒','I carry my things in a…',['🎒','Backpack'],['🥣','Bowl'],['🧦','Sock']]]],
+  ['Going places','🚗',[['🚗','We ride in the…',['🚗','Car'],['🛏️','Bed'],['🥄','Spoon']],['🚌','To school I ride the…',['🚌','Bus'],['🐱','Cat'],['🍎','Apple']],['🚲','I pedal my…',['🚲','Bike'],['🛁','Bathtub'],['📚','Book']]]],
+  ['Body','🧑',[['👀','I see with my…',['👀','Eyes'],['🦶','Feet'],['👂','Ears']],['👂','I hear with my…',['👂','Ears'],['👃','Nose'],['👄','Mouth']],['👃','I smell with my…',['👃','Nose'],['👀','Eyes'],['🦷','Teeth']]]],
+  ['Colors','🎨',[['🍌','A banana is…',['🟡','Yellow'],['🔵','Blue'],['🟢','Green']],['🍎','An apple is…',['🔴','Red'],['🟣','Purple'],['⚫','Black']],['🌿','Grass is…',['🟢','Green'],['🟠','Orange'],['🔴','Red']]]],
+  ['Helpers','🧑‍⚕️',[['🤒','When I am sick I see the…',['🧑‍⚕️','Doctor'],['👨‍🚒','Firefighter'],['👩‍🍳','Cook']],['🔥','A fire is put out by a…',['👨‍🚒','Firefighter'],['🧑‍🏫','Teacher'],['👮','Police officer']],['🏫','At school I learn from my…',['🧑‍🏫','Teacher'],['🧑‍⚕️','Doctor'],['👩‍🍳','Cook']]]],
+  ['Feelings','😊',[['🎁','A present makes me feel…',['😊','Happy'],['😢','Sad'],['😠','Angry']],['😢','When I cry I feel…',['😢','Sad'],['😊','Happy'],['😴','Sleepy']],['🥱','When I yawn I feel…',['😴','Sleepy'],['😠','Angry'],['😮','Surprised']]]],
+  ['Being kind','💚',[['🎁','When I get a gift I say…',['🙏','Thank you'],['👋','Bye-bye'],['😴','Night night']],['🙋','When I need help I say…',['🙋','Help me, please'],['👋','Hello'],['🏁','All done']],['👋','When I see my friend I say…',['👋','Hello'],['🙏','Thank you'],['😴','Night night']]]],
+  ['Mixed up','🎲',[['🐟','A fish swims in the…',['🌊','Water'],['🌳','Tree'],['🛏️','Bed']],['🐦','A bird builds a…',['🪹','Nest'],['🏠','House'],['🚗','Car']],['🌙','At night we see the…',['🌙','Moon'],['☀️','Sun'],['🌈','Rainbow']]]]
+];
+function fillQs(li){ const [,,qs]=FILL[li]; return qs.map(([em,q,...o])=>({text:'',emojis:em,question:q,fx:null,photo:null,options:optsOf(o)})) }
+
+/* ---- What do you say? (social scripts) ---- */
+// level: [name, emoji, [ [scene emojis, situation, correct, wrong, wrong, reason] x3 ]]
+const SOCIAL=[
+  ['Thank you','🙏',[['🍪🧑','Grandma gives you a cookie.',['🙏','Thank you'],['🙅','Go away'],['😴','Night night'],'We say thank you when someone gives us something.'],['🎁🧑','Your friend gives you a present.',['🙏','Thank you'],['🏁','All done'],['👋','Bye-bye'],'A present is kind, so we say thank you.'],['🧃👩','Mom pours you some juice.',['🙏','Thank you'],['🛑','Stop'],['👋','Hello'],'Mom helped you, so we say thank you.']]],
+  ['Hello','👋',[['🚪🧑‍🏫','Your teacher comes in the room.',['👋','Hello'],['😴','Night night'],['🙏','Thank you'],'When someone arrives, we say hello.'],['🏫🧒','You see your friend at school.',['👋','Hi'],['🏁','All done'],['🛑','Stop'],'Saying hi tells your friend you are happy to see them.'],['👵🏠','Grandpa visits your house.',['👋','Hello'],['🙅','Go away'],['⏳','Wait'],'We say hello to welcome Grandpa.']]],
+  ['Bye-bye','👋',[['🏫🚗','School is over and you go home.',['👋','Bye-bye'],['👋','Hello'],['🙏','Thank you'],'When we leave, we say bye-bye.'],['🏠👵','Grandma is going home.',['👋','Bye-bye'],['🍪','Snack time'],['🛑','Stop'],'Bye-bye tells Grandma we will miss her.'],['🛏️🌙','It is bedtime.',['😴','Night night'],['👋','Hello'],['🏁','All done'],'At bedtime we say night night.']]],
+  ['Please','🙋',[['🍪🧑','You want a cookie.',['🙋','Cookie, please'],['😠','Give me'],['🙅','No'],'Saying please is a kind way to ask.'],['🧸🧒','You want to play with the teddy.',['🙋','Can I have a turn, please?'],['😠','Mine'],['🛑','Stop'],'Asking with please helps your friend share.'],['🥛👩','You are thirsty.',['🙋','Milk, please'],['😢','Waah'],['👋','Bye-bye'],'Words with please get you what you need.']]],
+  ['Help me','🆘',[['🧩😣','The puzzle is too hard.',['🙋','Help me, please'],['😠','Stop it'],['👋','Bye-bye'],'Asking for help is smart and brave.'],['👟😣','You cannot tie your shoe.',['🙋','Help me, please'],['😴','Night night'],['🏁','All done'],'A grown-up can help when we ask.'],['🎒😣','Your backpack is stuck.',['🙋','Help me, please'],['🙏','Thank you'],['👋','Hello'],'Say help me, please, and someone will come.']]],
+  ['Stop','✋',[['🧒😣','A friend pokes you and you do not like it.',['✋','Stop, please'],['😴','Night night'],['🙏','Thank you'],'Stop, please tells a friend to stop with words.'],['🔊😣','Your brother is being too loud.',['✋','Stop, please'],['👋','Hello'],['🍪','Snack time'],'Words work better than yelling.'],['🎈😣','Someone pulls your balloon.',['✋','Stop, please'],['🙏','Thank you'],['🏁','All done'],'Say stop, please, then tell a grown-up if it keeps going.']]],
+  ['Sorry','😔',[['🥛💦','You spill your milk.',['😔','Sorry'],['👋','Hello'],['🙏','Thank you'],'Saying sorry helps when we make a mess.'],['🧒💥','You bump into your friend.',['😔','Sorry'],['🏁','All done'],['😴','Night night'],'Sorry tells your friend it was a mistake.'],['🧱💥','You knock down a tower by accident.',['😔','Sorry'],['👋','Bye-bye'],['🛑','Stop'],'Say sorry, then help build it again.']]],
+  ['My turn','🔁',[['🎮🧒','You want to play the game next.',['🙋','My turn, please'],['😠','Mine'],['👋','Bye-bye'],'My turn, please is a kind way to wait.'],['🛝🧒','Your friend is on the slide.',['⏳','I will wait'],['😠','Move'],['🙏','Thank you'],'We wait, then it is our turn.'],['🧸🧒','Your friend wants the teddy.',['🤝','Your turn'],['😠','No, mine'],['😴','Night night'],'Sharing a turn makes both of us happy.']]],
+  ['All done','🏁',[['🍽️😋','You finished your lunch.',['🏁','All done'],['👋','Hello'],['🙋','Help me, please'],'All done tells Mom you finished.'],['🛁🧒','Bath time is over.',['🏁','All done'],['🙏','Thank you'],['✋','Stop'],'All done means we are ready to get out.'],['🧩✅','The puzzle is finished.',['🏁','All done'],['😴','Night night'],['👋','Bye-bye'],'When the puzzle is finished, we say all done.']]],
+  ['More','➕',[['🍪😋','You want another cookie.',['➕','More, please'],['🏁','All done'],['👋','Bye-bye'],'More, please asks for another one kindly.'],['📖🧒','The story is over and you liked it.',['🔁','Again, please'],['🛑','Stop'],['😴','Night night'],'Again, please asks to hear it one more time.'],['🫧😋','The bubbles are gone.',['➕','More bubbles, please'],['🙅','Go away'],['🏁','All done'],'Ask for more with please.']]],
+  ['Yes and no','✅',[['🍎🧑','Mom asks, do you want an apple? You do.',['✅','Yes, please'],['🙅','No'],['👋','Bye-bye'],'When we want it, we say yes, please.'],['🥦🧑','Dad asks, do you want broccoli? You do not.',['🙅','No, thank you'],['😠','Yuck'],['👋','Hello'],'No, thank you is a kind way to say no.'],['🛝🧑','Dad asks, do you want to go to the park? You do.',['✅','Yes!'],['🙅','No'],['😴','Night night'],'Yes tells Dad you want to go.']]],
+  ['My name','🏷️',[['🧑‍🏫🧒','A new teacher asks, what is your name?',['🏷️','My name is…'],['👋','Bye-bye'],['🏁','All done'],'We tell our name so people know who we are.'],['🧒🧒','A new kid wants to play.',['👋','Hi, I am…'],['🙅','Go away'],['😴','Night night'],'Saying hi and your name starts a friendship.'],['👩‍⚕️🧒','The doctor says, hello! What is your name?',['🏷️','My name is…'],['✋','Stop'],['🍪','Snack time'],'The doctor wants to know your name to help you.']]],
+  ['I feel','💚',[['😢🧒','You feel sad and Mom asks why.',['💬','I feel sad'],['👋','Bye-bye'],['🏁','All done'],'Telling how we feel helps Mom help us.'],['😠🧒','Your tower fell and you are angry.',['💬','I feel angry'],['😴','Night night'],['🙏','Thank you'],'Saying I feel angry is better than hitting.'],['😊🧒','You got a new toy and feel happy.',['💬','I feel happy'],['✋','Stop'],['🙅','No'],'Sharing happy feelings is fun.']]],
+  ['I need','🫂',[['😫🧒','You are tired and need a rest.',['💬','I need a break'],['👋','Hello'],['🍪','Snack time'],'I need a break tells grown-ups you are tired.'],['🔊🧒','It is too loud for you.',['💬','It is too loud'],['🙏','Thank you'],['🏁','All done'],'Say it is too loud, and someone can help.'],['🫂🧒','You feel scared and want a hug.',['💬','I need a hug'],['👋','Bye-bye'],['🛑','Stop'],'Asking for a hug helps scared feelings go away.']]],
+  ['Mixed up','🎲',[['🎁🧑','Someone gives you a gift.',['🙏','Thank you'],['😔','Sorry'],['✋','Stop'],'We say thank you for a gift.'],['🥛💦','You spill a drink.',['😔','Sorry'],['👋','Hello'],['🙏','Thank you'],'We say sorry for a spill.'],['🧒😣','A friend grabs your toy.',['✋','Stop, please'],['😴','Night night'],['🏁','All done'],'We use words: stop, please.']]]
+];
+function socialQs(li){ const [,,qs]=SOCIAL[li]; return qs.map(([em,text,...rest])=>{ const o=rest.slice(0,3), reason=rest[3];
+  return {text,emojis:em,question:'What do you say?',fx:null,photo:null,options:o.map((x,i)=>({emoji:x[0],text:x[1],correct:i===0,why:i===0?`Yes! ${reason}`:`Hmm, not ${x[1].charAt(0).toLowerCase()+x[1].slice(1)}.`,whySay:i===0?['Yes!',reason]:['Hmm, not',x[1]]}))} }) }
+
+/* ---- Rhyme time ---- */
+// level: [name, emoji, [ [emoji of word, word, [rhyme emoji, rhyme], [wrong emoji, wrong], [wrong emoji, wrong]] x3 ]]
+const RHYME=[
+  ['Cat and hat','🐱',[['🐱','cat',['🎩','hat'],['🐶','dog'],['☀️','sun']],['🐸','frog',['🐶','dog'],['🐱','cat'],['🚗','car']],['🐷','pig',['🐘','big'],['🐱','cat'],['🥚','egg']]]],
+  ['Sun and bun','☀️',[['☀️','sun',['🥯','bun'],['🐱','cat'],['🐸','frog']],['🚗','car',['⭐','star'],['🐶','dog'],['🥚','egg']],['🐝','bee',['🌳','tree'],['🐷','pig'],['🧦','sock']]]],
+  ['Ball and wall','⚽',[['⚽','ball',['🧱','wall'],['🐱','cat'],['🥚','egg']],['🧦','sock',['🪨','rock'],['🐸','frog'],['🐝','bee']],['🐭','mouse',['🏠','house'],['🚗','car'],['🐷','pig']]]],
+  ['Bed and red','🛏️',[['🛏️','bed',['🔴','red'],['🐶','dog'],['⭐','star']],['🐠','fish',['🍽️','dish'],['🐱','cat'],['🥯','bun']],['🐐','goat',['⛵','boat'],['🧦','sock'],['🐸','frog']]]],
+  ['Moon and spoon','🌙',[['🌙','moon',['🥄','spoon'],['🐱','cat'],['🚗','car']],['🐻','bear',['🪑','chair'],['🐸','frog'],['🥚','egg']],['🔔','bell',['🐚','shell'],['🐶','dog'],['⭐','star']]]],
+  ['Cake and snake','🎂',[['🎂','cake',['🐍','snake'],['🐱','cat'],['🧦','sock']],['🐔','hen',['🖊️','pen'],['🚗','car'],['🥯','bun']],['🏠','house',['🐭','mouse'],['🐸','frog'],['🛏️','bed']]]],
+  ['Tree and bee','🌳',[['🌳','tree',['🔑','key'],['🐶','dog'],['🧦','sock']],['🧸','bear',['💇','hair'],['🐱','cat'],['🥚','egg']],['🚪','door',['4️⃣','four'],['⭐','star'],['🐷','pig']]]],
+  ['Duck and truck','🦆',[['🦆','duck',['🚚','truck'],['🐱','cat'],['🌳','tree']],['🐸','frog',['🪵','log'],['🥯','bun'],['🧦','sock']],['🐝','bee',['3️⃣','three'],['🐶','dog'],['🚗','car']]]],
+  ['Fox and box','🦊',[['🦊','fox',['📦','box'],['🐱','cat'],['⭐','star']],['🐱','cat',['🦇','bat'],['🐸','frog'],['🛏️','bed']],['🐭','mouse',['🏠','house'],['🥚','egg'],['🐝','bee']]]],
+  ['Star and car','⭐',[['⭐','star',['🚗','car'],['🐶','dog'],['🧦','sock']],['🌙','moon',['🎈','balloon'],['🐱','cat'],['🐷','pig']],['🐶','dog',['🐸','frog'],['🌳','tree'],['🥯','bun']]]],
+  ['Shoe and blue','👟',[['👟','shoe',['🔵','blue'],['🐱','cat'],['🥚','egg']],['🐑','sheep',['🚙','jeep'],['🐶','dog'],['⭐','star']],['🧦','sock',['🔒','lock'],['🐸','frog'],['🐝','bee']]]],
+  ['Ring and king','💍',[['💍','ring',['🤴','king'],['🐱','cat'],['🚗','car']],['🐟','fish',['🪄','wish'],['🐶','dog'],['🥯','bun']],['🍰','cake',['🌊','lake'],['🧦','sock'],['🐷','pig']]]],
+  ['Nose and rose','👃',[['👃','nose',['🌹','rose'],['🐱','cat'],['⭐','star']],['🐻','bear',['🍐','pear'],['🐸','frog'],['🥚','egg']],['🐔','hen',['🔟','ten'],['🐶','dog'],['🧦','sock']]]],
+  ['Goat and boat','🐐',[['🐐','goat',['🧥','coat'],['🐱','cat'],['🥯','bun']],['🐷','pig',['🪱','dig'],['🌳','tree'],['⭐','star']],['🧱','wall',['⚽','ball'],['🐸','frog'],['🚗','car']]]],
+  ['Mixed up','🎲',[['🐱','cat',['🎩','hat'],['🐸','frog'],['🌙','moon']],['🐸','frog',['🪵','log'],['🐱','cat'],['⭐','star']],['⭐','star',['🚗','car'],['🐶','dog'],['🥚','egg']]]]
+];
+function rhymeQs(li){ const [,,qs]=RHYME[li]; return qs.map(([em,word,good,...bad])=>({text:'',emojis:em,caption:word,question:`What rhymes with ${word}?`,fx:null,photo:null,
+  options:[{emoji:good[0],text:good[1],correct:true,why:`Yes! ${word} and ${good[1]} rhyme.`,whySay:['Yes!',`${word} and ${good[1]} rhyme.`]}].concat(bad.map(b=>({emoji:b[0],text:b[1],correct:false,why:`Hmm, ${word} and ${b[1]} do not rhyme.`,whySay:['Hmm, not',b[1]]})))})) }
+
+FEATS.push(
+  {id:'odd',title:'Odd one out',art:'odd',color:'#FFF0E0',levels:()=>ODD.map(x=>({name:x[0],emoji:x[1]})),qs:li=>oddQs(li)},
+  {id:'opp',title:'Opposites',art:'opp',color:'#E6F4FF',levels:()=>OPP.map(x=>({name:x[0],emoji:x[1]})),qs:li=>oppQs(li)},
+  {id:'fill',title:'Finish the sentence',art:'fill',color:'#F1E9FF',levels:()=>FILL.map(x=>({name:x[0],emoji:x[1]})),qs:li=>fillQs(li)},
+  {id:'social',title:'What do you say?',art:'social',color:'#E4F8EC',levels:()=>SOCIAL.map(x=>({name:x[0],emoji:x[1]})),qs:li=>socialQs(li)},
+  {id:'rhyme',title:'Rhyme time',art:'rhyme',color:'#FFF7D6',levels:()=>RHYME.map(x=>({name:x[0],emoji:x[1]})),qs:li=>rhymeQs(li)}
+);
+// star art for the new games: a soft gradient with big friendly emoji
+function emojiArt(c1,c2,e1,e2){ return `<svg viewBox="0 0 173 200" preserveAspectRatio="xMidYMid slice"><defs><linearGradient id="g${e1.codePointAt(0)}" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="${c1}"/><stop offset="1" stop-color="${c2}"/></linearGradient></defs><rect width="173" height="200" fill="url(#g${e1.codePointAt(0)})"/><text x="86" y="112" font-size="78" text-anchor="middle">${e1}</text>${e2?`<text x="132" y="78" font-size="40" text-anchor="middle">${e2}</text>`:''}</svg>` }
+Object.assign(ART,{
+  odd:emojiArt('#FFE1C2','#FFF4E6','🔍','🍎'), opp:emojiArt('#CDE8FF','#EAF5FF','🔥','🧊'), fill:emojiArt('#E3D6FF','#F3EEFF','💬','✏️'),
+  social:emojiArt('#C9F1DA','#EAFBF0','🙏','👋'), rhyme:emojiArt('#FFEFB5','#FFF9DF','🐱','🎩')
+});
+// every line these games can say, for the voice recorder
+function LINES2(){ const out=new Set(); const add=t=>{ if(typeof t==='string'&&t.trim()) out.add(t.trim()) };
+  for(const F of FEATS.filter(f=>['odd','opp','fill','social','rhyme'].includes(f.id))){ add(F.title); F.levels().forEach(L=>add(L.name));
+    for(let li=0;li<15;li++) for(const q of F.qs(li)){ add(q.text); add(q.question); add(q.caption); for(const o of q.options){ add(o.text); (o.whySay||[]).forEach(add) } } }
+  add('is different.'); return [...out] }
+
 function feelQs(li){
   if(li<5){ const pool=EMO_ORDER.slice(0,[3,4,6,8,10][li]); return pickN(pool,3).map(t=>({text:'',emojis:'🪞',caption:t.charAt(0).toUpperCase()+t.slice(1),question:`Which face looks ${t}?`,faces:true,
       options:[t,...pickN(pool.filter(x=>x!==t),2)].map(e=>({emoji:EMO[e],text:e,correct:e===t,why:e===t?`Yes! That face looks ${t}.`:`That face looks ${e}.`}))})) }
@@ -1480,11 +1619,13 @@ function viewHome(){
     b.addEventListener('click',()=>{ if(busy) return; SFX.pop(); homeScroll=scroll.scrollLeft; Voice.say(F.title); go(F.id==='mean'?viewMean:()=>viewLevels(F.id),b) });
     hive.append(b) });
   // stars in two zig-zag rows: each star tucks between the two above it
-  const lay=()=>{ const H=innerHeight-(innerHeight<520?112:150); let s=Math.min(H/1.72, innerWidth*.6, 400); s=Math.max(s,150);
+  // stars in zig-zag rows (3 rows on a tall screen, 2 on a short one): each star tucks between the two next to it
+  const lay=()=>{ const H=innerHeight-(innerHeight<520?112:150), rows=innerHeight>=640&&FEATS.length>12?3:2;
+    let s=Math.min(H/(1+(rows-1)*.72), innerWidth*.6, 400); s=Math.max(s,150);
     const col=s*.98, down=s*.7;
-    [...hive.children].forEach((el,i)=>{ const top=i%2===0, c=Math.floor(i/2);
-      Object.assign(el.style,{width:s+'px',height:s+'px',left:(c*col+(top?col/2:0))+'px',top:(top?0:down)+'px'}) });
-    hive.style.width=(Math.ceil(FEATS.length/2)*col+col/2+60)+'px'; hive.style.height=(s+down)+'px' };
+    [...hive.children].forEach((el,i)=>{ const r=i%rows, c=Math.floor(i/rows);
+      Object.assign(el.style,{width:s+'px',height:s+'px',left:(c*col+(r%2?col/2:0))+'px',top:(r*down)+'px'}) });
+    hive.style.width=(Math.ceil(FEATS.length/rows)*col+col/2+60)+'px'; hive.style.height=(s+(rows-1)*down)+'px' };
   lay(); addEventListener('resize',lay); cleanup=()=>removeEventListener('resize',lay);
   scroll.addEventListener('wheel',e=>{ if(Math.abs(e.deltaY)>Math.abs(e.deltaX)){ scroll.scrollLeft+=e.deltaY; e.preventDefault() } },{passive:false});
   requestAnimationFrame(()=>{ scroll.scrollLeft=homeScroll });
@@ -1547,7 +1688,7 @@ function viewQuiz(fid,li){
     if(q.fx){ const fx=h('div',{class:'fx '+q.fx}); const n=q.fx==='heart'?1:3; for(let k=0;k<n;k++) fx.append(h('i',null,q.fx==='heart'?'💗':q.fx==='sparkle'?'✨':'')); scene.append(fx) }
     const left=h('div',null,progress(),scene);
     if(q.text) left.append(h('p',{class:'sceneText'},speakBtn(()=>q.text,'Hear it again'),q.text));
-    const opts=h('div',{class:'opts'+(q.yesno?' two':'')+(q.faces?' faces':'')}); const feedback=h('div');
+    const opts=h('div',{class:'opts'+(q.yesno?' two':'')+(q.faces?' faces':'')+(q.four?' four':'')}); const feedback=h('div');
     const list=q.yesno?q.options:shuffle(q.options.filter(o=>o.text));
     list.forEach(o=>{
       const card=h('div',{class:'opt',role:'button',tabindex:'0','aria-label':o.text},h('span',{class:'oe'},o.emoji||'•'),h('span',{class:'ot'},o.text),speakBtn(()=>o.text,'Hear '+o.text));
